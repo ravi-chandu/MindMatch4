@@ -1,29 +1,30 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-/** MindMatch 4 — stable layout, system theme by default, instructions with GIF fallbacks */
+/** MindMatch 4 — robust hot-fix build
+ * - Plain relative asset paths
+ * - No DOM replacements in image onError
+ * - System theme default
+ * - Stable auto-fit layout
+ */
 
 const ROWS=6, COLS=7, HUMAN=1, AI=2;
-const LS_PROFILE="mm4_profile_v6";
-const LS_STATS="mm4_stats_v6";
+const LS_PROFILE="mm4_profile_v7";
+const LS_STATS="mm4_stats_v7";
 const LS_NAME="mm4_name";
 const LS_THEME="mm4_theme"; // "system" | "light" | "dark"
 
 const clone=b=>b.map(r=>r.slice());
 const empty=()=>Array.from({length:ROWS},()=>Array(COLS).fill(0));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const ASSET = (p)=> new URL(p, import.meta.env.BASE_URL).toString();
 
-/* ---------- theme (system by default) ---------- */
+/* ---------- theme ---------- */
 function applyTheme(mode){
   if(mode==="system" || !mode){ document.documentElement.removeAttribute("data-theme"); return; }
   document.documentElement.setAttribute("data-theme", mode);
 }
 function useTheme(){
-  // sanitize any stale values: default to "system"
-  const init = (()=> {
-    const t = localStorage.getItem(LS_THEME);
-    return (t==="light"||t==="dark"||t==="system") ? t : "system";
-  })();
+  const cached = localStorage.getItem(LS_THEME);
+  const init = (cached==="light"||cached==="dark"||cached==="system") ? cached : "system";
   const [mode,setMode]=useState(init);
   useEffect(()=>{ applyTheme(mode); localStorage.setItem(LS_THEME, mode||"system"); },[mode]);
   return [mode,setMode];
@@ -105,10 +106,9 @@ export default function App(){
   const query=useMemo(()=>parseQuery(),[]);
   const [theme,setTheme]=useTheme();
 
-  // "menu" | "vsai" | "local"
+  // screens: "menu" | "vsai" | "local"
   const [screen,setScreen]=useState("menu");
 
-  // game
   const [board,setBoard]=useState(()=>empty());
   const [turn,setTurn]=useState(HUMAN);
   const [status,setStatus]=useState("Your turn");
@@ -121,7 +121,7 @@ export default function App(){
   const w = useMemo(()=>winner(board),[board]);
   const over = w!==0;
 
-  // fit board safely (after layout paints)
+  // safe auto-fit
   const rootRef=useRef(null);
   const boardPanelRef=useRef(null);
   useEffect(()=>{
@@ -141,25 +141,21 @@ export default function App(){
 
       const isDesktop = vw >= 900;
 
-      // grid area height minus header/status/margins
-      const availH = vh - headerH - statusH - 24;        // total vertical space for main
-      // width for the board panel
+      const availH = vh - headerH - statusH - 24;
       const panelRect = panel.getBoundingClientRect();
       const availW = isDesktop ? panelRect.width : vw - 24;
 
-      // compute max cell size
       const cellW = (availW - gap*(COLS-1) - gap*2) / COLS;
       const cellH = (availH - gap*(ROWS-1) - gap*2) / ROWS;
       let cell = Math.floor(Math.max(28, Math.min(cellW, cellH)));
 
-      // cap for phone thumbs, grow on desktop
       cell = Math.min(cell, isDesktop ? 72 : 56);
 
       document.documentElement.style.setProperty("--cell", `${cell}px`);
       document.documentElement.style.setProperty("--disc-pad", `${Math.round(cell*0.18)}px`);
       document.documentElement.style.setProperty("--gap", `${Math.max(6, Math.round(cell*0.18))}px`);
     }
-    const rafFit = ()=> requestAnimationFrame(()=>requestAnimationFrame(fit)); // wait 2 frames
+    const rafFit = ()=> requestAnimationFrame(()=>requestAnimationFrame(fit));
     rafFit();
     const ro = new ResizeObserver(rafFit);
     ro.observe(document.body);
@@ -198,7 +194,7 @@ export default function App(){
     if(screen==="menu" || !over) return;
     const res = (screen==="vsai")
       ? (w===HUMAN?'W':w===AI?'L':'D')
-      : (w===HUMAN?'W':'L'); // treat P1 as HUMAN for stats
+      : (w===HUMAN?'W':'L');
     const p={...profile, lastTen:[...profile.lastTen, (res==='W'?'W':'L')].slice(-10)};
     const ns=updStats(stats,res);
     adapt(p,ns); saveProfile(p); saveStats(ns); setProfile(p); setStats(ns);
@@ -230,14 +226,14 @@ export default function App(){
   function reset(){ setBoard(empty()); setTurn(HUMAN); setOverlay(null); }
   function resetAll(){ saveProfile(defProfile()); saveStats(defStats()); setProfile(defProfile()); setStats(defStats()); reset(); }
   function shareUrl(){ const u=new URL(location.href); u.searchParams.set("mm4","1"); u.searchParams.set("mode","streak"); u.searchParams.set("target",String(stats.bestStreak||1)); u.searchParams.set("depth",String(profile.aiConfig.depth)); u.searchParams.set("rand",String(profile.aiConfig.randomness)); u.searchParams.set("style",String(profile.aiConfig.style)); return u.toString(); }
-  async function share(){ const link=shareUrl(); const text=`MindMatch 4 — beat my ${stats.bestStreak}-win streak!`; if(navigator.share){try{await navigator.share({title:"MindMatch 4 — Challenge",text,url:link}); return;}catch{}} await navigator.clipboard?.writeText(link); setToast("Challenge link copied!"); setTimeout(()=>setToast(null),1500); }
+  async function share(){ const link=shareUrl(); if(navigator.share){try{await navigator.share({title:"MindMatch 4 — Challenge",text:`Beat my ${stats.bestStreak}-win streak!`,url:link}); return;}catch{}} await navigator.clipboard?.writeText(link); setToast("Challenge link copied!"); setTimeout(()=>setToast(null),1500); }
 
   /* ---------- screens ---------- */
   if(screen==="menu"){
     return (
       <div ref={rootRef} style={ui.page}>
         <header className="mm4-header" style={ui.header}>
-          <img src={ASSET('logo-128.png')} alt="MindMatch 4 logo" width="40" height="40" style={{borderRadius:8}}/>
+          <img src="./logo-128.png" alt="MindMatch 4 logo" width="40" height="40" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
         </header>
 
         <main style={ui.menuMain}>
@@ -251,7 +247,6 @@ export default function App(){
             <button style={{...ui.btn, background:"#38bdf8"}} onClick={()=>{setScreen("local"); reset();}}>Multiplayer (Local)</button>
           </div>
 
-          {/* Theme (system by default) */}
           <div style={ui.row}>
             <label style={{...ui.muted,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
               Theme
@@ -263,34 +258,15 @@ export default function App(){
             </label>
           </div>
 
-          {/* How to play — GIFs with SVG fallbacks */}
+          {/* How to play (GIFs optional) */}
           <section style={ui.help}>
             <h2 style={ui.h2}>How to play</h2>
-            <div style={ui.steps}>
-              <div style={ui.step}>
-                <div style={ui.stepMedia}>
-                  <img src={ASSET('howto-drop.gif')} alt="" onError={(e)=>e.currentTarget.replaceWith(FallbackSVG("Tap a column"))} style={ui.gif}/>
-                </div>
-                <div style={ui.stepText}><b>1.</b> Tap/click a column to drop your disc. Discs stack from the <b>bottom</b>.</div>
-              </div>
-              <div style={ui.step}>
-                <div style={ui.stepMedia}>
-                  <img src={ASSET('howto-win.gif')} alt="" onError={(e)=>e.currentTarget.replaceWith(FallbackSVG("Make four in a row"))} style={ui.gif}/>
-                </div>
-                <div style={ui.stepText}><b>2.</b> Connect <b>four in a row</b> (horizontal, vertical, or diagonal) to win.</div>
-              </div>
-              <div style={ui.step}>
-                <div style={ui.stepMedia}>
-                  <img src={ASSET('howto-share.gif')} alt="" onError={(e)=>e.currentTarget.replaceWith(FallbackSVG("Share a challenge"))} style={ui.gif}/>
-                </div>
-                <div style={ui.stepText}><b>3.</b> Share a <b>challenge link</b> and ask friends to beat your best streak.</div>
-              </div>
+            <div style={ui.steps} className="mm4-help-steps">
+              <HowTo img="./howto-drop.gif" text="Tap a column to drop a disc. Discs stack from the bottom."/>
+              <HowTo img="./howto-win.gif" text="Connect four in a row (horizontal, vertical, or diagonal) to win."/>
+              <HowTo img="./howto-share.gif" text="Share a challenge link and ask friends to beat your best streak."/>
             </div>
           </section>
-
-          <div style={ui.menuFoot}>
-            <div style={{...ui.muted,fontSize:12}}>“Multiplayer (Local)” is hot‑seat on the same device. Online play needs a tiny backend—we can add Firebase/WebRTC later.</div>
-          </div>
         </main>
       </div>
     );
@@ -300,7 +276,7 @@ export default function App(){
   return (
     <div ref={rootRef} style={ui.page}>
       <header className="mm4-header" style={ui.header}>
-        <img src={ASSET('logo-128.png')} alt="MindMatch 4 logo" width="36" height="36" style={{borderRadius:8}}/>
+        <img src="./logo-128.png" alt="MindMatch 4 logo" width="36" height="36" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
         <div style={{textAlign:"center",flex:1}}>
           <div style={ui.h1Small}>MindMatch 4</div>
           <div style={ui.taglineSmall}>{screen==="vsai" ? "Beat the adaptive AI." : "Local hot‑seat: P1 vs P2"}</div>
@@ -351,7 +327,10 @@ export default function App(){
           </div>
           <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:8,flexWrap:"wrap"}}>
             <button style={{...ui.btn,background:"#38bdf8"}} onClick={reset}>New Game</button>
-            <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
+            <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button}
+            >
+              Share
+            </button>
             <button style={{...ui.btn,background:"#ef4444"}} onClick={resetAll}>Reset Profile</button>
           </div>
         </section>
@@ -406,19 +385,23 @@ export default function App(){
   );
 }
 
-/* ---------- SVG fallback for instructions ---------- */
-function FallbackSVG(text){
-  const el = document.createElementNS("http://www.w3.org/2000/svg","svg");
-  el.setAttribute("viewBox","0 0 320 180");
-  el.setAttribute("width","320"); el.setAttribute("height","180");
-  el.innerHTML = `
-    <defs>
-      <linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#0b162b"/><stop offset="1" stop-color="#0a1222"/></linearGradient>
-    </defs>
-    <rect x="0" y="0" width="320" height="180" rx="16" fill="url(#g)"/>
-    <circle cx="70" cy="90" r="20" fill="#ef4444"/><circle cx="120" cy="90" r="20" fill="#fbbf24"/>
-    <text x="160" y="96" fill="#e5e7eb" font-size="14" font-family="Arial" text-anchor="middle">${text}</text>`;
-  return el;
+/* ---------- HowTo card (with safe placeholder) ---------- */
+function HowTo({img, text}){
+  const [ok,setOk]=useState(true);
+  return (
+    <div style={ui.step}>
+      <div style={ui.stepMedia}>
+        {ok ? (
+          <img src={img} alt="" onError={()=>setOk(false)} style={ui.gif}/>
+        ) : (
+          <div style={{...ui.gif, display:"grid", placeItems:"center", color:"var(--muted)", fontSize:12}}>
+            (Add {img})
+          </div>
+        )}
+      </div>
+      <div style={ui.stepText}>{text}</div>
+    </div>
+  );
 }
 
 /* ---------- styles ---------- */
@@ -438,13 +421,12 @@ const ui = {
   menuMain:{display:"grid", gridTemplateRows:"auto auto auto 1fr", gap:12, height:"calc(100svh - 64px)", padding:"0 12px", overflow:"hidden"},
   titleWrap:{marginTop:4},
   menuButtons:{display:"flex", gap:10, justifyContent:"center", marginTop:8, flexWrap:"wrap"},
-  help:{background:"var(--panel)", border:"1px solid var(--panel-border)", borderRadius:16, padding:12},
+  help:{background:"var(--panel)", border:"1px solid var(--panel-border)", borderRadius:16, padding:12, overflow:"auto"},
   steps:{display:"grid", gridTemplateColumns:"1fr", gap:12},
   step:{display:"grid", gridTemplateColumns:"160px 1fr", gap:12, alignItems:"center"},
   stepMedia:{width:160, height:90, overflow:"hidden", borderRadius:10, border:"1px solid var(--panel-border)"},
-  gif:{width:"100%", height:"100%", objectFit:"cover", display:"block"},
+  gif:{width:"100%", height:"100%", objectFit:"cover"},
   stepText:{fontSize:14},
-  menuFoot:{display:"grid", placeItems:"center"},
   status:{display:"flex",justifyContent:"space-between",alignItems:"center", padding:"0 12px 6px"},
   main:{maxWidth:1200, margin:"0 auto", padding:"0 12px", display:"grid", gridTemplateColumns:"1fr", gap:12, height:"calc(100svh - 136px)"},
   panel:{background:"var(--panel)", border:"1px solid var(--panel-border)", borderRadius:16, padding:12, boxShadow:"0 10px 30px rgba(0,0,0,.12)", minHeight:0, overflow:"hidden"},
@@ -468,12 +450,7 @@ const ui = {
   toast:{position:"fixed", bottom:16, left:"50%", transform:"translateX(-50%)", background:"var(--panel)", color:"var(--ink)", padding:"8px 12px", border:"1px solid var(--panel-border)", borderRadius:10}
 };
 
-// desktop: stats on right, instructions in 3 columns
+// desktop layout
 const styleEl=document.createElement("style");
-styleEl.textContent=`
-@media (min-width: 900px){
-  .mm4-main{ grid-template-columns: minmax(0,1fr) 320px; }
-  .mm4-help-steps{ grid-template-columns: repeat(3,1fr); }
-}
-`;
+styleEl.textContent=`@media (min-width: 900px){ .mm4-main{ grid-template-columns: minmax(0,1fr) 320px; } .mm4-help-steps{ grid-template-columns: repeat(3,1fr); } }`;
 document.head.appendChild(styleEl);
