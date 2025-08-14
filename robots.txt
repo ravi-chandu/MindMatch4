@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ravi-chandu.github.io/MindMatch4/sitemap.xml
