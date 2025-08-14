@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MindMatch 4 — Adaptive Connect Four</title>
+
+    <!-- Optional: enable Firebase global leaderboard.
+         1) Uncomment the 3 scripts below
+         2) Paste your Firebase config into the window.MM4_FIREBASE_CONFIG object -->
+    <!--
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+    <script>
+      // REPLACE with your actual Firebase project keys to enable global leaderboard
+      window.MM4_FIREBASE_CONFIG = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        // (Firestore only needs projectId; apiKey is needed by the SDK in browser)
+      };
+    </script>
+    -->
+    <style>
+      :root { --ink:#e2e8f0; --muted:#94a3b8; }
+      html, body, #root { height: 100%; }
+      body {
+        margin:0; background: linear-gradient(#0f172a,#0b1222);
+        color: var(--ink);
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans";
+      }
+      /* Confetti canvas sits above everything when active */
+      #mm4-confetti { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.jsx"></script>
+  </body>
+</html>
