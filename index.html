@@ -8,10 +8,10 @@
     <title>MindMatch 4 — Adaptive Connect Four | Smart Mind Game</title>
 
     <!-- SEO -->
-    <meta name="description" content="MindMatch 4 is an adaptive Connect Four mind game. The AI learns your style and gets harder as you win. Play vs AI or in local multiplayer." />
+    <meta name="description" content="MindMatch 4 is an adaptive Connect Four game. The AI learns your style and gets harder as you win. Play vs AI or local multiplayer." />
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
 
-    <!-- Social preview -->
+    <!-- Social -->
     <meta property="og:title" content="MindMatch 4 — Adaptive Connect Four" />
     <meta property="og:description" content="Beat the AI… if you can. It learns your strategy and ramps up." />
     <meta property="og:type" content="website" />
@@ -20,25 +20,21 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
 
-    <!-- Icons (from your provided image) -->
-    <link rel="icon" type="image/x-icon" href="./favicon.ico" />
-    <link rel="icon" type="image/png" sizes="32x32" href="./logo-32.png" />
-    <link rel="icon" type="image/png" sizes="64x64" href="./logo-64.png" />
-    <link rel="apple-touch-icon" sizes="192x192" href="./logo-192.png" />
-    <link rel="apple-touch-icon" sizes="512x512" href="./logo-512.png" />
+    <!-- Icons (all files live in /public) -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/logo-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/logo-64.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/logo-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/logo-512.png" />
 
-    <!-- Base theme + responsive sizing variables -->
+    <!-- Base theme tokens -->
     <style>
       :root{
         --bg:#ffffff; --bg2:#f3f4f6; --ink:#111827; --muted:#6b7280;
         --panel:rgba(255,255,255,.92); --panel-border:rgba(0,0,0,.08);
         --hole:#e5e7eb; --grid:#d1d5db;
         --red:#ef4444; --yellow:#fbbf24; --green:#16a34a;
-
-        /* board sizing (auto-updated at runtime so it fits the screen) */
-        --cell: 56px;   /* computed by JS to avoid scrolling */
-        --gap: 10px;    /* spacing between holes */
-        --disc-pad: 10px;
+        --cell:56px; --gap:10px; --disc-pad:10px;
       }
       @media (prefers-color-scheme: dark){
         :root{
@@ -57,19 +53,13 @@
         --panel:rgba(17,24,39,.85); --panel-border:rgba(255,255,255,.08);
         --hole:#0f172a; --grid:#1f2937;
       }
-
       html,body,#root{height:100%}
-      body{
-        margin:0; background:linear-gradient(180deg,var(--bg2),var(--bg)); color:var(--ink);
-        font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
-        padding-top: env(safe-area-inset-top, 0);
-        overflow:hidden; /* no scroll */
-      }
-      #mm4-confetti{position:fixed; inset:0; pointer-events:none; z-index:40;}
+      body{margin:0;background:linear-gradient(180deg,var(--bg2),var(--bg));color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";overflow:hidden}
+      #mm4-confetti{position:fixed;inset:0;pointer-events:none;z-index:40}
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="./index.jsx"></script>
+    <script type="module" src="/index.jsx"></script>
   </body>
 </html>
