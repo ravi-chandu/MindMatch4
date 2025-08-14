@@ -8,7 +8,7 @@
     <title>MindMatch 4 — Adaptive Connect Four | Smart Mind Game</title>
 
     <!-- SEO -->
-    <meta name="description" content="MindMatch 4 is an adaptive Connect Four mind game. The AI learns your playstyle and gets harder as you win. Share challenges with friends."/>
+    <meta name="description" content="MindMatch 4 is an adaptive Connect Four mind game. The AI learns your style and gets harder as you win. Play vs AI or in local multiplayer." />
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
 
     <!-- Social preview -->
@@ -20,26 +20,25 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
 
-    <!-- Icons -->
+    <!-- Icons (from your provided image) -->
     <link rel="icon" type="image/x-icon" href="./favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="./logo-32.png" />
     <link rel="icon" type="image/png" sizes="64x64" href="./logo-64.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="./logo-192.png" />
     <link rel="apple-touch-icon" sizes="512x512" href="./logo-512.png" />
 
-    <!-- Base theme variables -->
+    <!-- Base theme + responsive sizing variables -->
     <style>
       :root{
-        /* colors */
         --bg:#ffffff; --bg2:#f3f4f6; --ink:#111827; --muted:#6b7280;
         --panel:rgba(255,255,255,.92); --panel-border:rgba(0,0,0,.08);
         --hole:#e5e7eb; --grid:#d1d5db;
-        --red:#ef4444; --yellow:#fbbf24; --green:#16a34a; --blue:#2563eb;
+        --red:#ef4444; --yellow:#fbbf24; --green:#16a34a;
 
-        /* sizing (controlled by the size switcher) */
-        --cell: 56px;         /* disc diameter incl. margin zone */
-        --gap: 10px;          /* spacing between cells/columns */
-        --disc-pad: 10px;     /* hole→disc inset */
+        /* board sizing (auto-updated at runtime so it fits the screen) */
+        --cell: 56px;   /* computed by JS to avoid scrolling */
+        --gap: 10px;    /* spacing between holes */
+        --disc-pad: 10px;
       }
       @media (prefers-color-scheme: dark){
         :root{
@@ -64,9 +63,9 @@
         margin:0; background:linear-gradient(180deg,var(--bg2),var(--bg)); color:var(--ink);
         font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
         padding-top: env(safe-area-inset-top, 0);
+        overflow:hidden; /* no scroll */
       }
-      /* Confetti sits below overlay */
-      #mm4-confetti{ position:fixed; inset:0; pointer-events:none; z-index:40; }
+      #mm4-confetti{position:fixed; inset:0; pointer-events:none; z-index:40;}
     </style>
   </head>
   <body>
