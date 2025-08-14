@@ -3,63 +3,75 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <meta name="theme-color" content="#0f172a">
-    <title>MindMatch 4 — Adaptive Connect Four | Smart Mind Game that Learns You</title>
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <title>MindMatch 4 — Adaptive Connect Four | Smart Mind Game</title>
 
     <!-- SEO -->
-    <meta name="description" content="MindMatch 4 is an adaptive Connect Four mind game. The AI learns your playstyle, gets harder as you win, and lets you share challenges with friends." />
-    <meta name="keywords" content="mind games, connect four, adaptive ai game, strategy game online, brain games, multiplayer challenge, smart games, board games online" />
+    <meta name="description" content="MindMatch 4 is an adaptive Connect Four mind game. The AI learns your style, gets harder as you win, and lets you share challenges with friends." />
+    <meta name="keywords" content="mind games, connect four, adaptive ai game, strategy game online, brain games, challenge friends" />
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
 
-    <!-- Open Graph -->
+    <!-- Open Graph / Twitter -->
     <meta property="og:title" content="MindMatch 4 — Adaptive Connect Four" />
-    <meta property="og:description" content="Beat the AI… if you can. It learns your strategy and gets tougher. Share a challenge link with friends!" />
+    <meta property="og:description" content="Beat the AI… if you can. It learns your strategy and gets tougher. Share a challenge link!" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://ravi-chandu.github.io/MindMatch4/" />
     <meta property="og:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
-
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="MindMatch 4 — Adaptive Connect Four" />
     <meta name="twitter:description" content="An AI that learns your moves. Every win makes it stronger." />
     <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
 
-    <!-- JSON‑LD: Game schema -->
+    <!-- JSON-LD -->
     <script type="application/ld+json">
     {
-      "@context": "https://schema.org",
-      "@type": "Game",
-      "name": "MindMatch 4",
-      "alternateName": "MindMatch Four",
-      "applicationCategory": "Game,OnlineGame",
-      "genre": ["Strategy","BoardGame","Mind game"],
-      "url": "https://ravi-chandu.github.io/MindMatch4/",
-      "description": "Adaptive Connect Four: the AI learns your playstyle and ramps difficulty. Share streak challenges with friends.",
-      "inLanguage": "en",
-      "publisher": { "@type": "Person", "name": "Ravi" }
+      "@context":"https://schema.org",
+      "@type":"Game",
+      "name":"MindMatch 4",
+      "applicationCategory":["Game","OnlineGame"],
+      "genre":["Strategy","BoardGame","Mind game"],
+      "url":"https://ravi-chandu.github.io/MindMatch4/",
+      "description":"Adaptive Connect Four: the AI learns your playstyle and ramps difficulty. Share streak challenges with friends.",
+      "inLanguage":"en",
+      "publisher":{"@type":"Person","name":"Ravi"}
     }
     </script>
 
-    <!-- Favicon (inline SVG so you get a crisp icon) -->
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230f172a'/%3E%3Ccircle cx='20' cy='20' r='8' fill='%23ef4444'/%3E%3Ccircle cx='32' cy='32' r='8' fill='%23fbbf24'/%3E%3Ccircle cx='44' cy='44' r='8' fill='%2338bdf8'/%3E%3Ctext x='6' y='60' font-size='16' fill='%23e2e8f0' font-family='Arial, sans-serif'%3E4%3C/text%3E%3C/svg%3E" />
+    <!-- Favicon/logo is an inline SVG (tiny + crisp) -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230f172a'/%3E%3Ccircle cx='22' cy='22' r='8' fill='%23ef4444'/%3E%3Ccircle cx='32' cy='32' r='8' fill='%23fbbf24'/%3E%3Ccircle cx='42' cy='42' r='8' fill='%2338bdf8'/%3E%3Ctext x='8' y='58' font-size='16' fill='%23e5e7eb' font-family='Arial'%3E4%3C/text%3E%3C/svg%3E"/>
 
+    <!-- Theme variables -->
     <style>
       :root{
-        --bg:#0f172a; --bg2:#111827; --ink:#e5e7eb; --muted:#9ca3af;
-        --red:#ef4444; --yellow:#fbbf24; --blue:#38bdf8; --green:#22c55e;
-        /* responsive cell size for mobile-first UX */
-        --cell: clamp(38px, 12.5vw, 64px);
+        --bg:#ffffff; --bg2:#f3f4f6; --ink:#111827; --muted:#6b7280;
+        --panel:rgba(255,255,255,.9); --panel-border:rgba(0,0,0,.08);
+        --cell: clamp(44px, 13vw, 64px);
         --gap: clamp(6px, 2vw, 12px);
+        --red:#ef4444; --yellow:#fbbf24; --blue:#2563eb; --green:#16a34a;
+        --hole:#e5e7eb; --grid:#d1d5db;
+      }
+      @media (prefers-color-scheme: dark){
+        :root{
+          --bg:#0b1222; --bg2:#0f172a; --ink:#e5e7eb; --muted:#94a3b8;
+          --panel:rgba(17,24,39,.85); --panel-border:rgba(255,255,255,.08);
+          --hole:#0f172a; --grid:#1f2937;
+        }
       }
       html,body,#root{height:100%}
-      body{margin:0;background:linear-gradient(180deg,#0f172a,#0b1222);color:var(--ink);
-        font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,'Helvetica Neue',Arial,'Noto Sans';}
-      #mm4-confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
+      body{
+        margin:0;
+        background:linear-gradient(180deg,var(--bg2),var(--bg));
+        color:var(--ink);
+        font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
+        padding-top: env(safe-area-inset-top, 0);
+      }
+      /* Confetti canvas (z-index lower than the result overlay) */
+      #mm4-confetti{position:fixed; inset:0; pointer-events:none; z-index:40;}
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <!-- IMPORTANT: relative path so Pages works -->
     <script type="module" src="./index.jsx"></script>
   </body>
 </html>
