@@ -1,44 +1,29 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
-/** MindMatch 4 — mobile-first with flexible size (S/M/L)
- *  - Board/grid scales via CSS variables: --cell, --gap, --disc-pad
- *  - Size selector (Small/Medium/Large) persisted to localStorage
- *  - Bottom-first stacking, visible holes/grid, theme toggle
- *  - Adaptive AI, share challenge, stats, confetti with overlay above
+/** MindMatch 4 (mobile-first, single-screen)
+ *  - Home screen: Play vs AI, Multiplayer (Local Hot‑Seat)
+ *  - Auto-fit board (no scroll): computes --cell from viewport + panel sizes
+ *  - Stats on right (desktop), below board (mobile)
+ *  - System theme by default + manual switch
+ *  - Uses your logo files (logo-128.png, etc.)
  */
 
 const ROWS=6, COLS=7, HUMAN=1, AI=2;
-const LS_PROFILE="mm4_profile_v4";
-const LS_STATS="mm4_stats_v4";
+const LS_PROFILE="mm4_profile_v5";
+const LS_STATS="mm4_stats_v5";
 const LS_NAME="mm4_name";
-const LS_THEME="mm4_theme";       // system | light | dark
-const LS_SIZE="mm4_size";         // small | medium | large
+const LS_THEME="mm4_theme";  // "system" | "light" | "dark"
 
 const clone=b=>b.map(r=>r.slice());
 const empty=()=>Array.from({length:ROWS},()=>Array(COLS).fill(0));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-/* ---------- theme & size ---------- */
-function applyTheme(mode){ if(mode==="system"){ document.documentElement.removeAttribute("data-theme"); return; } document.documentElement.setAttribute("data-theme",mode); }
-function useTheme(){ const [mode,setMode]=useState(()=>localStorage.getItem(LS_THEME)||"system"); useEffect(()=>{applyTheme(mode); localStorage.setItem(LS_THEME,mode);},[mode]); return [mode,setMode]; }
-
-function applySize(sz){
-  // Map sizes to variables. Adjust to your taste.
-  const map = {
-    small:  { cell:"44px", gap:"8px",  pad:"8px"  },
-    medium: { cell:"56px", gap:"10px", pad:"10px" },
-    large:  { cell:"68px", gap:"12px", pad:"12px" }
-  };
-  const v = map[sz] || map.medium;
-  const r = document.documentElement;
-  r.style.setProperty("--cell", v.cell);
-  r.style.setProperty("--gap", v.gap);
-  r.style.setProperty("--disc-pad", v.pad);
-}
-function useBoardSize(){
-  const [sz,setSz]=useState(()=>localStorage.getItem(LS_SIZE) || "medium");
-  useEffect(()=>{ applySize(sz); localStorage.setItem(LS_SIZE,sz); },[sz]);
-  return [sz,setSz];
+/* ---------- theme ---------- */
+function applyTheme(mode){ if(mode==="system"){ document.documentElement.removeAttribute("data-theme"); return; } document.documentElement.setAttribute("data-theme", mode); }
+function useTheme(){
+  const [mode,setMode]=useState(()=>localStorage.getItem(LS_THEME)||"system");
+  useEffect(()=>{applyTheme(mode); localStorage.setItem(LS_THEME,mode);},[mode]);
+  return [mode,setMode];
 }
 
 /* ---------- storage ---------- */
@@ -49,7 +34,7 @@ function defStats(){return{games:0,wins:0,losses:0,draws:0,bestStreak:0,curStrea
 function loadStats(){try{return JSON.parse(localStorage.getItem(LS_STATS))||defStats()}catch{return defStats()}}
 function saveStats(s){localStorage.setItem(LS_STATS, JSON.stringify(s))}
 
-/* ---------- query ---------- */
+/* ---------- helpers ---------- */
 const parseQuery=()=>{const sp=new URLSearchParams(location.search); const q=Object.fromEntries(sp.entries()); ["target","depth","rand"].forEach(k=>q[k]=q[k]!==undefined?Number(q[k]):undefined); return q}
 
 /* ---------- board logic ---------- */
@@ -102,7 +87,7 @@ function adapt(p,s){ const wr=(s.wins||0)/Math.max(1,s.games||0); const streaky=
 function updStats(s,res){ const n={...s}; n.games++; if(res==='W'){n.wins++; n.curStreak++; n.bestStreak=Math.max(n.bestStreak,n.curStreak); n.rating+=12+Math.max(0,6-Math.floor(n.curStreak/2));}
   else if(res==='L'){n.losses++; n.curStreak=0; n.rating-=10;} else {n.draws++; n.rating-=2;} n.rating=clamp(Math.round(n.rating),600,3000); return n; }
 
-/* ---------- confetti (under overlay) ---------- */
+/* ---------- confetti ---------- */
 function confetti(ms=1000){
   const old=document.getElementById("mm4-confetti"); if(old) old.remove();
   const c=document.createElement("canvas"); c.id="mm4-confetti"; document.body.appendChild(c);
@@ -116,8 +101,11 @@ function confetti(ms=1000){
 export default function App(){
   const query=useMemo(()=>parseQuery(),[]);
   const [theme,setTheme]=useTheme();
-  const [size,setSize]=useBoardSize();
 
+  // home: "menu" | "vsai" | "local"
+  const [screen,setScreen]=useState("menu");
+
+  // game state
   const [board,setBoard]=useState(()=>empty());
   const [turn,setTurn]=useState(HUMAN);
   const [status,setStatus]=useState("Your turn");
@@ -130,18 +118,93 @@ export default function App(){
   const w = useMemo(()=>winner(board),[board]);
   const over = w!==0;
 
+  // auto-fit sizing: compute --cell so whole app fits 100svh without scroll
+  const rootRef=useRef(null);
+  const boardBoxRef=useRef(null);
+  useEffect(()=>{
+    function fit(){
+      const root = rootRef.current;
+      const box = boardBoxRef.current;
+      if(!root || !box) return;
+
+      const styles = getComputedStyle(document.documentElement);
+      const gap = parseFloat(styles.getPropertyValue("--gap")) || 10;
+      const pad = gap*2; // board padding approx
+
+      const header = root.querySelector(".mm4-header")?.getBoundingClientRect().height || 0;
+      const status = root.querySelector(".mm4-status")?.getBoundingClientRect().height || 0;
+
+      const vh = Math.max(window.innerHeight, document.documentElement.clientHeight);
+      const vw = Math.max(window.innerWidth, document.documentElement.clientWidth);
+
+      // layout: on desktop we have stats on the right; on mobile stats are below
+      const isDesktop = vw >= 900;
+
+      // available height for main content
+      const availH = vh - header - status - 16; // margins
+      // board container dims
+      const boxRect = box.getBoundingClientRect();
+      const availW = isDesktop ? (boxRect.width) : vw - 24;
+
+      // compute max cell without scroll
+      const cellW = (availW - gap*(COLS-1) - pad) / COLS;
+      const cellH = (availH - gap*(ROWS-1) - pad) / ROWS;
+      let cell = Math.floor(Math.max(28, Math.min(cellW, cellH)));
+
+      // prefer a bit smaller on phones for thumbs
+      if (!isDesktop) cell = Math.min(cell, 56);
+
+      document.documentElement.style.setProperty("--cell", `${cell}px`);
+      document.documentElement.style.setProperty("--disc-pad", `${Math.round(cell*0.18)}px`);
+      document.documentElement.style.setProperty("--gap", `${Math.max(6, Math.round(cell*0.18))}px`);
+    }
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(document.body);
+    window.addEventListener("orientationchange", fit);
+    window.addEventListener("resize", fit);
+    return ()=>{ ro.disconnect(); window.removeEventListener("orientationchange",fit); window.removeEventListener("resize",fit); }
+  },[]);
+
+  // adapt on mount
   useEffect(()=>{const p=adapt({...profile},{...stats}); saveProfile(p); setProfile(p); /* eslint-disable-next-line */},[]);
 
-  useEffect(()=>{ if (turn!==AI || over) return; const t=setTimeout(()=>{const mv=decide(board,profile,query); if(mv==null) return; const nb=drop(board,mv,AI); if(!nb) return; setBoard(nb); setTurn(HUMAN);},160); return()=>clearTimeout(t); },[turn,over,board,profile,query]);
+  // AI move
+  useEffect(()=>{
+    if(screen!=="vsai") return;
+    if (turn!==AI || over) return;
+    const t=setTimeout(()=>{
+      const mv=decide(board,profile,query);
+      if(mv==null) return;
+      const nb=drop(board,mv,AI); if(!nb) return;
+      setBoard(nb); setTurn(HUMAN);
+    },160);
+    return ()=>clearTimeout(t);
+  },[turn,over,board,profile,query,screen]);
 
-  useEffect(()=>{ if (w===HUMAN) setStatus("You win! 🎉"); else if (w===AI) setStatus("AI wins 🤖"); else if (w===3) setStatus("Draw"); else setStatus(turn===HUMAN? "Your turn" : "AI thinking…"); },[turn,w]);
+  // status text
+  useEffect(()=>{
+    if(screen==="menu"){ setStatus(""); return; }
+    if (w===HUMAN) setStatus("Player 1 wins! 🎉");
+    else if (w===AI && screen==="vsai") setStatus("AI wins 🤖");
+    else if (w===AI && screen==="local") setStatus("Player 2 wins! 🎉");
+    else if (w===3) setStatus("Draw");
+    else setStatus(turn===HUMAN? (screen==="vsai"?"Your turn":"P1 turn") : (screen==="vsai"?"AI thinking…":"P2 turn"));
+  },[turn,w,screen]);
 
-  useEffect(()=>{ if (!over) return; const res=w===HUMAN?'W':w===AI?'L':'D';
-    const p={...profile, lastTen:[...profile.lastTen,res].slice(-10)}; const ns=updStats(stats,res); adapt(p,ns); saveProfile(p); saveStats(ns); setProfile(p); setStats(ns);
-    if (res==='W') confetti(1000);
-    setOverlay(res==='W'?'win':res==='L'?'lose':'draw'); // overlay above confetti
+  // end of game
+  useEffect(()=>{
+    if(screen==="menu" || !over) return;
+    const res = (screen==="vsai")
+      ? (w===HUMAN?'W':w===AI?'L':'D')
+      : (w===HUMAN?'W':'L'); // for local, treat P1 as HUMAN stats
+    const p={...profile, lastTen:[...profile.lastTen, (res==='W'?'W':'L')].slice(-10)};
+    const ns=updStats(stats,res);
+    adapt(p,ns); saveProfile(p); saveStats(ns); setProfile(p); setStats(ns);
+    if(res==='W') confetti(1000);
+    setOverlay(w===3?'draw':(res==='W'?'win':'lose'));
   // eslint-disable-next-line
-  },[over]);
+  },[over,screen]);
 
   function decide(b,p,q){
     const ms=moves(b); if(!ms.length) return null;
@@ -154,75 +217,101 @@ export default function App(){
   }
 
   function human(col){
-    if (turn!==HUMAN || over) return;
-    const nb=drop(board,col,HUMAN); if(!nb) return;
-    setBoard(nb); setTurn(AI);
-    const p={...profile}; p.humanColumnFreq[col]=(p.humanColumnFreq[col]||0)+1; saveProfile(p); setProfile(p);
+    if (over) return;
+    if (screen==="vsai" && turn!==HUMAN) return;
+    if (screen==="local" && turn!==HUMAN && turn!==AI) return;
+
+    const player = (screen==="local" ? (turn===HUMAN?HUMAN:AI) : HUMAN);
+    const nb=drop(board,col,player); if(!nb) return;
+    setBoard(nb);
+    if(screen==="vsai"){ setTurn(AI); const p={...profile}; p.humanColumnFreq[col]=(p.humanColumnFreq[col]||0)+1; saveProfile(p); setProfile(p); }
+    else { setTurn(turn===HUMAN?AI:HUMAN); } // alternate P1/P2
   }
+
   function reset(){ setBoard(empty()); setTurn(HUMAN); setOverlay(null); }
   function resetAll(){ saveProfile(defProfile()); saveStats(defStats()); setProfile(defProfile()); setStats(defStats()); reset(); }
   function shareUrl(){ const u=new URL(location.href); u.searchParams.set("mm4","1"); u.searchParams.set("mode","streak"); u.searchParams.set("target",String(stats.bestStreak||1)); u.searchParams.set("depth",String(profile.aiConfig.depth)); u.searchParams.set("rand",String(profile.aiConfig.randomness)); u.searchParams.set("style",String(profile.aiConfig.style)); return u.toString(); }
   async function share(){ const link=shareUrl(); const text=`MindMatch 4 — beat my ${stats.bestStreak}-win streak!`; if(navigator.share){try{await navigator.share({title:"MindMatch 4 — Challenge",text,url:link}); return;}catch{}} await navigator.clipboard?.writeText(link); setToast("Challenge link copied!"); setTimeout(()=>setToast(null),1500); }
 
-  const challengeBanner = (query.mode==='streak' && query.target);
+  /* ---------- screens ---------- */
+  if(screen==="menu"){
+    return (
+      <div ref={rootRef} style={ui.page}>
+        <header className="mm4-header" style={ui.header}>
+          <img src="./logo-128.png" alt="MindMatch 4 logo" width="40" height="40" style={{borderRadius:8}}/>
+        </header>
 
-  return (
-    <div style={st.page}>
-      <header style={st.header}>
-        <div style={st.brandRow}>
-          <img src="./logo-128.png" alt="MindMatch 4 logo" width="36" height="36" style={{borderRadius:8,marginRight:10}}/>
-          <div>
-            <div style={{fontSize:26,fontWeight:800,lineHeight:1}}>MindMatch 4</div>
-            <div style={st.muted}>{challengeBanner?`Challenge: Beat a ${query.target}-win streak.`:"Every win makes me stronger."}</div>
+        <main style={ui.menuMain}>
+          <div style={ui.titleWrap}>
+            <h1 style={ui.h1}>MindMatch 4</h1>
+            <div style={ui.tagline}>Every win makes me stronger.</div>
           </div>
+
+          <div style={ui.menuButtons}>
+            <button style={{...ui.btn, background:"#22c55e"}} onClick={()=>{setScreen("vsai"); reset();}}>Play vs AI</button>
+            <button style={{...ui.btn, background:"#38bdf8"}} onClick={()=>{setScreen("local"); reset();}}>Multiplayer (Local)</button>
+          </div>
+
+          <div style={ui.row}>
+            <label style={{...ui.muted,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
+              Theme
+              <select value={theme} onChange={e=>setTheme(e.target.value)} style={ui.select}>
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+          </div>
+
+          <div style={ui.menuFoot}>
+            <div style={{...ui.muted,fontSize:12}}>Tip: “Multiplayer (Local)” is hot‑seat on the same device. Online play needs a small server—happy to wire that when you’re ready.</div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Game UI
+  return (
+    <div ref={rootRef} style={ui.page}>
+      <header className="mm4-header" style={ui.header}>
+        <img src="./logo-128.png" alt="MindMatch 4 logo" width="36" height="36" style={{borderRadius:8}}/>
+        <div style={{textAlign:"center",flex:1}}>
+          <div style={ui.h1Small}>MindMatch 4</div>
+          <div style={ui.taglineSmall}>{screen==="vsai" ? "Beat the adaptive AI." : "Local hot‑seat: P1 vs P2"}</div>
         </div>
-        <div style={st.row}>
-          {/* Size selector */}
-          <label style={{...st.muted,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
-            Size
-            <select value={size} onChange={e=>setSize(e.target.value)} style={st.select}>
-              <option value="small">Small</option>
-              <option value="medium">Medium</option>
-              <option value="large">Large</option>
-            </select>
-          </label>
-          {/* Theme selector */}
-          <label style={{...st.muted,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
-            Theme
-            <select value={theme} onChange={e=>setTheme(e.target.value)} style={st.select}>
-              <option value="system">System</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </label>
-          <button style={{...st.btn,background:"#38bdf8"}} onClick={reset}>New Game</button>
-          <button style={{...st.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
-          <button style={{...st.btn,background:"#ef4444"}} onClick={resetAll}>Reset Profile</button>
+        <div style={ui.rowRight}>
+          <select value={theme} onChange={e=>setTheme(e.target.value)} style={ui.select}>
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+          <button style={{...ui.btn,background:"#ef4444"}} onClick={()=>{setScreen("menu");}}>Home</button>
         </div>
       </header>
 
-      <div style={st.status}>
+      <div className="mm4-status" style={ui.status}>
         <div style={{fontWeight:700}}>{status}</div>
-        <div style={{...st.muted,fontSize:14}}>
-          Depth <b>{profile.aiConfig.depth}</b> · RNG <b>{Math.round(profile.aiConfig.randomness*100)}%</b> ·
-          Style <b>{profile.aiConfig.style}</b> · Rating <b>{stats.rating}</b> · Best Streak <b>{stats.bestStreak}</b>
+        <div style={{...ui.muted,fontSize:14}}>
+          {screen==="vsai" ? <>Depth <b>{profile.aiConfig.depth}</b> · RNG <b>{Math.round(profile.aiConfig.randomness*100)}%</b> · Style <b>{profile.aiConfig.style}</b> · </> : null}
+          Rating <b>{stats.rating}</b> · Best Streak <b>{stats.bestStreak}</b>
         </div>
       </div>
 
-      {/* Board-first on mobile; two columns on wide screens */}
-      <main style={st.main} className="mm4-main">
-        <section style={st.panel}>
-          <div style={st.boardWrap}>
-            <div style={st.boardFrame}>
-              <div style={st.boardGrid}>
+      <main className="mm4-main" style={ui.main}>
+        {/* Board (left/top) */}
+        <section ref={boardBoxRef} style={ui.panel}>
+          <div style={ui.boardWrap}>
+            <div style={ui.boardFrame}>
+              <div style={ui.boardGrid}>
                 {Array.from({length:COLS}).map((_, c)=>{
                   const col = [...board.map(r=>r[c])].reverse(); // bottom-first
                   return (
-                    <button key={c} style={st.colBtn} onClick={()=>human(c)} title={`Drop in column ${c+1}`} disabled={!!winner(board)}>
+                    <button key={c} style={ui.colBtn} onClick={()=>human(c)} title={`Drop in column ${c+1}`} disabled={!!winner(board)}>
                       {col.map((cell,i)=>(
-                        <div key={i} style={st.cell}>
+                        <div key={i} style={ui.cell}>
                           <div style={{
-                            ...st.disc,
+                            ...ui.disc,
                             background: cell===HUMAN? "var(--red)" : cell===AI? "var(--yellow)" : "transparent",
                             boxShadow: cell? "inset 0 6px 12px rgba(0,0,0,.35)":"none"
                           }}/>
@@ -232,27 +321,33 @@ export default function App(){
                   );
                 })}
               </div>
-              <div style={st.holes} aria-hidden="true"></div>
+              <div style={ui.holes} aria-hidden="true"></div>
             </div>
+          </div>
+          <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:8}}>
+            <button style={{...ui.btn,background:"#38bdf8"}} onClick={reset}>New Game</button>
+            <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
+            <button style={{...ui.btn,background:"#ef4444"}} onClick={resetAll}>Reset Profile</button>
           </div>
         </section>
 
-        <aside style={st.panel}>
+        {/* Stats (right on desktop, below on mobile) */}
+        <aside style={ui.panel}>
           <h3 style={{marginTop:0}}>Stats</h3>
           <div style={{fontSize:14,lineHeight:1.6}}>
-            <div><span style={st.muted}>Games:</span> {stats.games}</div>
-            <div><span style={st.muted}>Wins:</span> {stats.wins} · <span style={st.muted}>Losses:</span> {stats.losses} · <span style={st.muted}>Draws:</span> {stats.draws}</div>
-            <div><span style={st.muted}>Recent:</span> {profile.lastTen.join(" ") || "—"}</div>
+            <div><span style={ui.muted}>Games:</span> {stats.games}</div>
+            <div><span style={ui.muted}>Wins:</span> {stats.wins} · <span style={ui.muted}>Losses:</span> {stats.losses} · <span style={ui.muted}>Draws:</span> {stats.draws}</div>
+            <div><span style={ui.muted}>Recent:</span> {profile.lastTen.join(" ") || "—"}</div>
           </div>
 
           <h4 style={{margin:"16px 0 8px"}}>Your Column Preferences</h4>
-          <div style={st.bars}>
+          <div style={ui.bars}>
             {profile.humanColumnFreq.map((f,i,arr)=>{
               const total=Math.max(1,arr.reduce((a,b)=>a+b,0));
               const h=(f/total)*100;
               return (
-                <div key={i} style={st.bar}>
-                  <div style={st.barOuter}><div style={{...st.barInner,height:`${h}%`}}/></div>
+                <div key={i} style={ui.bar}>
+                  <div style={ui.barOuter}><div style={{...ui.barInner,height:`${h}%`}}/></div>
                   <div style={{textAlign:"center",fontSize:12,marginTop:6}}>{i+1}</div>
                 </div>
               );
@@ -260,56 +355,60 @@ export default function App(){
           </div>
 
           <h4 style={{margin:"18px 0 8px"}}>Name</h4>
-          <input value={name} onChange={e=>{setName(e.target.value); localStorage.setItem(LS_NAME,e.target.value);}} placeholder="Your name" style={st.input}/>
+          <input value={name} onChange={e=>{setName(e.target.value); localStorage.setItem(LS_NAME,e.target.value);}} placeholder="Your name" style={ui.input}/>
         </aside>
       </main>
 
       {overlay && (
-        <div style={{...st.overlay, zIndex:60}}>
-          <div style={st.card}>
+        <div style={{...ui.overlay, zIndex:60}}>
+          <div style={ui.card}>
             <div style={{fontSize:26,fontWeight:800,marginBottom:8}}>
-              {overlay==='win'?"You win! 🎉":overlay==='lose'?"AI wins 🤖":"Draw"}
+              {overlay==='win'?"You win! 🎉":overlay==='lose'?"You lost":"Draw"}
             </div>
-            <div style={{...st.muted,marginBottom:10}}>
-              {overlay==='win' ? "Nice! Try to push your streak." : "Go again—you'll get it."}
+            <div style={{...ui.muted,marginBottom:10}}>
+              {overlay==='win' ? "Nice! Try to push your streak." : overlay==='lose' ? "Go again—you’ll get it." : "Evenly matched!"}
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-              <button style={{...st.btn,background:"#38bdf8"}} onClick={()=>{setOverlay(null); reset();}}>Play Again</button>
-              <button style={{...st.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
+              <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setOverlay(null); reset();}}>Play Again</button>
+              <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
             </div>
           </div>
         </div>
       )}
 
-      {toast && <div style={st.toast}>{toast}</div>}
+      {toast && <div style={ui.toast}>{toast}</div>}
     </div>
   );
 }
 
 /* ---------- styles ---------- */
-const st = {
-  page:{minHeight:"100vh", background:"linear-gradient(180deg,var(--bg2),var(--bg))", color:"var(--ink)"},
-  header:{position:"sticky", top:"env(safe-area-inset-top, 0)", zIndex:10, background:"linear-gradient(180deg,var(--bg2),transparent)", padding:"8px 12px"},
-  brandRow:{display:"flex",alignItems:"center",gap:10, flex:1},
-  row:{display:"flex",gap:8, flexWrap:"wrap"},
+const ui = {
+  page:{minHeight:"100svh", background:"linear-gradient(180deg,var(--bg2),var(--bg))", color:"var(--ink)", overflow:"hidden"},
+  header:{display:"flex",alignItems:"center",gap:12, padding:"10px 12px"},
+  h1:{margin:"0 0 6px", fontSize:32, fontWeight:900, textAlign:"center"},
+  tagline:{textAlign:"center", color:"var(--muted)"},
+  h1Small:{fontSize:20, fontWeight:800, lineHeight:1},
+  taglineSmall:{fontSize:12, color:"var(--muted)"},
+  row:{display:"flex",gap:8,alignItems:"center",justifyContent:"center",marginTop:14},
+  rowRight:{display:"flex",gap:8,alignItems:"center"},
   btn:{border:0,padding:"10px 14px",borderRadius:12,color:"#fff",fontWeight:700,cursor:"pointer"},
   select:{border:"1px solid var(--panel-border)", background:"var(--panel)", color:"var(--ink)", borderRadius:10, padding:"8px 10px", fontWeight:600},
   muted:{color:"var(--muted)"},
-  status:{maxWidth:1100, margin:"6px auto 10px", padding:"0 12px", display:"flex",justifyContent:"space-between",alignItems:"center"},
-  main:{maxWidth:1100, margin:"0 auto", padding:"0 12px", display:"grid", gridTemplateColumns:"1fr", gap:12},
-  panel:{background:"var(--panel)", border:"1px solid var(--panel-border)", borderRadius:16, padding:12, boxShadow:"0 10px 30px rgba(0,0,0,.12)"},
+  menuMain:{display:"grid", gridTemplateRows:"auto auto auto 1fr", gap:12, height:"calc(100svh - 64px)", padding:"0 12px"},
+  titleWrap:{marginTop:4},
+  menuButtons:{display:"flex", gap:10, justifyContent:"center", marginTop:8},
+  menuFoot:{display:"grid", placeItems:"center"},
+  status:{display:"flex",justifyContent:"space-between",alignItems:"center", padding:"0 12px 6px"},
+  main:{maxWidth:1200, margin:"0 auto", padding:"0 12px", display:"grid", gridTemplateColumns:"1fr", gap:12, height:"calc(100svh - 136px)"},
+  panel:{background:"var(--panel)", border:"1px solid var(--panel-border)", borderRadius:16, padding:12, boxShadow:"0 10px 30px rgba(0,0,0,.12)", minHeight:0},
   /* Board */
-  boardWrap:{display:"grid", placeItems:"center"},
-  boardFrame:{position:"relative", borderRadius:16, padding:"calc(var(--gap) * .6)", background:"linear-gradient(180deg,#0b162b,#0a1222)"},
+  boardWrap:{display:"grid", placeItems:"center", height:"100%"},
+  boardFrame:{position:"relative", borderRadius:16, padding:"calc(var(--gap) * .6)", background:"linear-gradient(180deg,#0b162b,#0a1222)", height:"100%", width:"fit-content", maxWidth:"100%"},
   boardGrid:{position:"relative", display:"grid", gridTemplateColumns:"repeat(7, var(--cell))", gap:"var(--gap)", padding:"var(--gap)", borderRadius:12, background:"var(--bg2)"},
   holes:{position:"absolute", inset:0, pointerEvents:"none", borderRadius:12, boxShadow:"inset 0 0 0 2px var(--grid), inset 0 6px 18px rgba(0,0,0,.35)"},
   colBtn:{display:"flex",flexDirection:"column",justifyContent:"flex-end",gap:"var(--gap)",background:"transparent",border:0,cursor:"pointer",padding:0},
-  cell:{
-    width:"var(--cell)", height:"var(--cell)", borderRadius:"50%", display:"grid", placeItems:"center",
-    background:"radial-gradient(circle at 50% 50%, var(--hole) 62%, transparent 63%)",
-    boxShadow:"inset 0 0 0 1px var(--grid)"
-  },
-  disc:{width:"calc(var(--cell) - var(--disc-pad))", height:"calc(var(--cell) - var(--disc-pad))", borderRadius:"50%", transition:"transform .25s ease"},
+  cell:{width:"var(--cell)", height:"var(--cell)", borderRadius:"50%", display:"grid", placeItems:"center", background:"radial-gradient(circle at 50% 50%, var(--hole) 62%, transparent 63%)", boxShadow:"inset 0 0 0 1px var(--grid)"},
+  disc:{width:"calc(var(--cell) - var(--disc-pad))", height:"calc(var(--cell) - var(--disc-pad))", borderRadius:"50%", transition:"transform .2s ease"},
   /* Stats */
   bars:{display:"flex",gap:6,alignItems:"end"},
   bar:{flex:1},
@@ -322,7 +421,7 @@ const st = {
   toast:{position:"fixed", bottom:16, left:"50%", transform:"translateX(-50%)", background:"var(--panel)", color:"var(--ink)", padding:"8px 12px", border:"1px solid var(--panel-border)", borderRadius:10}
 };
 
-/* wide screens: stats at right */
+// desktop layout: stats on right
 const styleEl=document.createElement("style");
 styleEl.textContent=`@media (min-width: 900px){ .mm4-main{ grid-template-columns: 1fr 320px; } }`;
 document.head.appendChild(styleEl);
