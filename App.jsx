@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+/** MindMatch 4 — mobile-first with flexible size (S/M/L)
+ *  - Board/grid scales via CSS variables: --cell, --gap, --disc-pad
+ *  - Size selector (Small/Medium/Large) persisted to localStorage
+ *  - Bottom-first stacking, visible holes/grid, theme toggle
+ *  - Adaptive AI, share challenge, stats, confetti with overlay above
+ */
+
 const ROWS=6, COLS=7, HUMAN=1, AI=2;
 const LS_PROFILE="mm4_profile_v4";
 const LS_STATS="mm4_stats_v4";
