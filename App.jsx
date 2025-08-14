@@ -1,432 +1,711 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 
 /** MindMatch 4 — production build
- * - Auto-fit board (no scroll/overlap)
- * - System theme default (no attribute unless user chooses)
- * - Home: Play vs AI & Local hot‑seat
- * - Instructions: horizontal, vertical, diagonal win GIFs
+ *
+ * This version has been enhanced to include:
+ * - Firebase Firestore integration for a global, real-time leaderboard.
+ * - Refactored UI components for a cleaner, more modern look.
+ * - Improved code organization and state management.
+ * - A more robust, mobile-first responsive design.
+ *
+ * @author Gemini
  */
 
-const ROWS=6, COLS=7, HUMAN=1, AI=2;
-const LS_PROFILE="mm4_profile_v8";
-const LS_STATS="mm4_stats_v8";
-const LS_NAME="mm4_name";
-const LS_THEME="mm4_theme"; // "system" | "light" | "dark"
+// --- Global Constants & Utilities ---
+const ROWS = 6;
+const COLS = 7;
+const HUMAN = 1;
+const AI = 2;
 
-const clone=b=>b.map(r=>r.slice());
-const empty=()=>Array.from({length:ROWS},()=>Array(COLS).fill(0));
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const LS_PROFILE = "mm4_profile_v9";
+const LS_STATS = "mm4_stats_v9";
+const LS_NAME = "mm4_name";
+const LS_THEME = "mm4_theme"; // "system" | "light" | "dark"
 
-/* ---------- theme ---------- */
-function applyTheme(mode){ if(mode==="system"||!mode){document.documentElement.removeAttribute("data-theme");return;} document.documentElement.setAttribute("data-theme",mode); }
-function useTheme(){
-  const cached=localStorage.getItem(LS_THEME);
-  const init=(cached==="light"||cached==="dark"||cached==="system")?cached:"system";
-  const [mode,setMode]=useState(init);
-  useEffect(()=>{applyTheme(mode);localStorage.setItem(LS_THEME,mode||"system");},[mode]);
-  return [mode,setMode];
-}
+// Firestore global variables
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
 
-/* ---------- storage ---------- */
-function defProfile(){return{humanColumnFreq:Array(COLS).fill(0),lastTen:[],aiConfig:{depth:4,randomness:0.2,style:"balanced"}}}
-function loadProfile(){try{const s=localStorage.getItem(LS_PROFILE); if(!s) return defProfile(); const p=JSON.parse(s); return {...defProfile(),...p,aiConfig:{...defProfile().aiConfig,...(p.aiConfig||{})}}}catch{return defProfile()}}
-function saveProfile(p){localStorage.setItem(LS_PROFILE,JSON.stringify(p))}
-function defStats(){return{games:0,wins:0,losses:0,draws:0,bestStreak:0,curStreak:0,rating:1200}}
-function loadStats(){try{return JSON.parse(localStorage.getItem(LS_STATS))||defStats()}catch{return defStats()}}
-function saveStats(s){localStorage.setItem(LS_STATS,JSON.stringify(s))}
+const clone = b => b.map(r => r.slice());
+const empty = () => Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-/* ---------- misc ---------- */
-const parseQuery=()=>{const sp=new URLSearchParams(location.search); const q=Object.fromEntries(sp.entries()); ["target","depth","rand"].forEach(k=>q[k]=q[k]!==undefined?Number(q[k]):undefined); return q}
-
-/* ---------- board ---------- */
-function drop(b,col,pl){ if(b[0][col]!==0) return null; const nb=clone(b); for(let r=ROWS-1;r>=0;r--) if(nb[r][col]===0){nb[r][col]=pl; return nb} return null }
-function moves(b){const m=[]; for(let c=0;c<COLS;c++) if(b[0][c]===0) m.push(c); return m}
-function winner(b){
-  const dirs=[[0,1],[1,0],[1,1],[1,-1]], inB=(r,c)=>r>=0&&r<ROWS&&c>=0&&c<COLS;
-  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ const p=b[r][c]; if(!p) continue;
-    for(const[dr,dc] of dirs){ let k=1, nr=r+dr, nc=c+dc; while(inB(nr,nc)&&b[nr][nc]===p){ if(++k>=4) return p; nr+=dr; nc+=dc; } }
-  }
-  return moves(b).length?0:3;
-}
-
-/* ---------- AI ---------- */
-function evalWin(w, player){
-  const opp=player===AI?HUMAN:AI, cp=w.filter(x=>x===player).length, co=w.filter(x=>x===opp).length, ce=w.filter(x=>x===0).length;
-  if(cp===4) return 100000;
-  if(cp===3 && ce===1) return 200;
-  if(cp===2 && ce===2) return 40;
-  if(co===3 && ce===1) return -180;
-  if(co===2 && ce===2) return -30;
-  return 0;
-}
-function scorePos(b, player, style="balanced"){
-  let s=0, center=Math.floor(COLS/2);
-  for(let r=0;r<ROWS;r++) if(b[r][center]===player) s+=8;
-  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS-3;c++) s+=evalWin([b[r][c],b[r][c+1],b[r][c+2],b[r][c+3]], player);
-  for(let c=0;c<COLS;c++) for(let r=0;r<ROWS-3;r++) s+=evalWin([b[r][c],b[r+1][c],b[r+2][c],b[r+3][c]], player);
-  for(let r=0;r<ROWS-3;r++) for(let c=0;c<COLS-3;c++) s+=evalWin([b[r][c],b[r+1][c+1],b[r+2][c+2],b[r+3][c+3]], player);
-  for(let r=3;r<ROWS;r++) for(let c=0;c<COLS-3;c++) s+=evalWin([b[r][c],b[r-1][c+1],b[r-2][c+2],b[r-3][c+3]], player);
-  if(style==="aggressive") s*=1.08; else if(style==="defensive") s*=0.98;
-  return s;
-}
-function minimax(b,d,maxing,style,bias,alpha=-Infinity,beta=Infinity){
-  const w=winner(b);
-  if(d===0||w){ if(w===AI) return{score:1e9}; if(w===HUMAN) return{score:-1e9}; if(w===3) return{score:0}; return{score:scorePos(b,AI,style)}; }
-  const ms=moves(b).sort((a,c)=>Math.abs(a-3)-Math.abs(c-3)), pen=c=>(bias[c]||0)*1.5;
-  if(maxing){ let best={score:-Infinity,col:ms[0]}; for(const c of ms){const child=drop(b,c,AI); if(!child) continue; let{score}=minimax(child,d-1,false,style,bias,alpha,beta); score-=pen(c); if(score>best.score) best={score,col:c}; alpha=Math.max(alpha,score); if(beta<=alpha) break;} return best; }
-  let best={score:Infinity,col:ms[0]}; for(const c of ms){const child=drop(b,c,HUMAN); if(!child) continue; let{score}=minimax(child,d-1,true,style,bias,alpha,beta); score+=pen(c); if(score<best.score) best={score,col:c}; beta=Math.min(beta,score); if(beta<=alpha) break;} return best;
-}
-
-/* ---------- adapt & stats ---------- */
-function adapt(p,s){ const wr=(s.wins||0)/Math.max(1,s.games||0), streaky=(s.curStreak||0)>=3;
-  const depth=Math.round(3+4*clamp(wr*1.4,0,1));
-  const randomness=Math.max(0.05,0.35-wr*0.4-(streaky?0.08:0));
-  const center=(p.humanColumnFreq[3]||0)+(p.humanColumnFreq[2]||0)+(p.humanColumnFreq[4]||0);
-  const edge=(p.humanColumnFreq[0]||0)+(p.humanColumnFreq[1]||0)+(p.humanColumnFreq[5]||0)+(p.humanColumnFreq[6]||0);
-  p.aiConfig={depth, randomness:Number(randomness.toFixed(2)), style:center>=edge?"defensive":"aggressive"}; return p;
-}
-function updStats(s,res){ const n={...s}; n.games++; if(res==='W'){n.wins++; n.curStreak++; n.bestStreak=Math.max(n.bestStreak,n.curStreak); n.rating+=12+Math.max(0,6-Math.floor(n.curStreak/2));}
-  else if(res==='L'){n.losses++; n.curStreak=0; n.rating-=10;} else {n.draws++; n.rating-=2;} n.rating=clamp(Math.round(n.rating),600,3000); return n; }
-
-/* ---------- confetti ---------- */
-function confetti(ms=1000){
-  const old=document.getElementById("mm4-confetti"); if(old) old.remove();
-  const c=document.createElement("canvas"); c.id="mm4-confetti"; document.body.appendChild(c);
-  const ctx=c.getContext("2d"); const resize=()=>{c.width=innerWidth; c.height=innerHeight}; resize(); addEventListener("resize",resize,{once:true});
-  const cols=["#ef4444","#f59e0b","#10b981","#38bdf8","#a78bfa"];
-  const ps=Array.from({length:100},()=>({x:Math.random()*c.width,y:-20-Math.random()*c.height*.4,vx:(Math.random()-.5)*5,vy:3+Math.random()*4,g:.18+Math.random()*.18,w:8+Math.random()*6,h:12+Math.random()*8,a:Math.random()*Math.PI,s:(Math.random()<.5?-1:1)*(.1+Math.random()*.2),color:cols[Math.floor(Math.random()*cols.length)]}));
-  const stop=performance.now()+ms; const tick=t=>{ctx.clearRect(0,0,c.width,c.height); ps.forEach(p=>{p.vy+=p.g; p.x+=p.vx; p.y+=p.vy; p.a+=p.s; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.a); ctx.fillStyle=p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore();}); if(t<stop) requestAnimationFrame(tick); else c.remove();}; requestAnimationFrame(tick);
-}
-
-/* ---------- App ---------- */
-export default function App(){
-  const query=useMemo(()=>parseQuery(),[]);
-  const [theme,setTheme]=useTheme();
-
-  const [screen,setScreen]=useState("menu"); // "menu" | "vsai" | "local"
-  const [board,setBoard]=useState(()=>empty());
-  const [turn,setTurn]=useState(HUMAN);
-  const [status,setStatus]=useState("Your turn");
-  const [profile,setProfile]=useState(()=>loadProfile());
-  const [stats,setStats]=useState(()=>loadStats());
-  const [overlay,setOverlay]=useState(null);
-  const [name,setName]=useState(()=>localStorage.getItem(LS_NAME)||"Player");
-  const [toast,setToast]=useState(null);
-
-  const w=useMemo(()=>winner(board),[board]);
-  const over=w!==0;
-
-  // safe auto-fit
-  const rootRef=useRef(null);
-  const boardPanelRef=useRef(null);
-  useEffect(()=>{
-    function fit(){
-      const root=rootRef.current, panel=boardPanelRef.current;
-      if(!root||!panel) return;
-      const styles=getComputedStyle(document.documentElement);
-      const gap=parseFloat(styles.getPropertyValue("--gap"))||10;
-      const headerH=root.querySelector(".mm4-header")?.getBoundingClientRect().height||0;
-      const statusH=root.querySelector(".mm4-status")?.getBoundingClientRect().height||0;
-      const vw=Math.max(innerWidth,document.documentElement.clientWidth);
-      const vh=Math.max(innerHeight,document.documentElement.clientHeight);
-      const isDesktop=vw>=900;
-      const availH=vh-headerH-statusH-24;
-      const panelRect=panel.getBoundingClientRect();
-      const availW=isDesktop?panelRect.width:vw-24;
-      const cellW=(availW-gap*(COLS-1)-gap*2)/COLS;
-      const cellH=(availH-gap*(ROWS-1)-gap*2)/ROWS;
-      let cell=Math.floor(Math.max(28,Math.min(cellW,cellH)));
-      cell=Math.min(cell,isDesktop?72:56);
-      document.documentElement.style.setProperty("--cell",`${cell}px`);
-      document.documentElement.style.setProperty("--disc-pad",`${Math.round(cell*0.18)}px`);
-      document.documentElement.style.setProperty("--gap",`${Math.max(6,Math.round(cell*0.18))}px`);
+// --- Theme Management ---
+const applyTheme = (mode) => {
+    if (mode === "system" || !mode) {
+        document.documentElement.removeAttribute("data-theme");
+        return;
     }
-    const rafFit=()=>requestAnimationFrame(()=>requestAnimationFrame(fit));
-    rafFit();
-    const ro=new ResizeObserver(rafFit);
-    ro.observe(document.body);
-    addEventListener("resize",rafFit);
-    addEventListener("orientationchange",rafFit);
-    return ()=>{ro.disconnect();removeEventListener("resize",rafFit);removeEventListener("orientationchange",rafFit);};
-  },[]);
-
-  // adapt on mount
-  useEffect(()=>{const p=adapt({...profile},{...stats}); saveProfile(p); setProfile(p);/*eslint-disable-next-line*/},[]);
-
-  // AI move
-  useEffect(()=>{
-    if(screen!=="vsai") return;
-    if(turn!==AI || over) return;
-    const t=setTimeout(()=>{
-      const mv=decide(board,profile,query);
-      if(mv==null) return;
-      const nb=drop(board,mv,AI); if(!nb) return;
-      setBoard(nb); setTurn(HUMAN);
-    },160);
-    return ()=>clearTimeout(t);
-  },[turn,over,board,profile,query,screen]);
-
-  // status
-  useEffect(()=>{
-    if(screen==="menu"){ setStatus(""); return; }
-    if (w===HUMAN) setStatus(screen==="vsai"?"You win! 🎉":"Player 1 wins! 🎉");
-    else if (w===AI) setStatus(screen==="vsai"?"AI wins 🤖":"Player 2 wins! 🎉");
-    else if (w===3) setStatus("Draw");
-    else setStatus(turn===HUMAN? (screen==="vsai"?"Your turn":"P1 turn") : (screen==="vsai"?"AI thinking…":"P2 turn"));
-  },[turn,w,screen]);
-
-  // end of game
-  useEffect(()=>{
-    if(screen==="menu"||!over) return;
-    const res=(screen==="vsai")?(w===HUMAN?'W':w===AI?'L':'D'):(w===HUMAN?'W':'L');
-    const p={...profile,lastTen:[...profile.lastTen,(res==='W'?'W':'L')].slice(-10)};
-    const ns=updStats(stats,res);
-    adapt(p,ns); saveProfile(p); saveStats(ns); setProfile(p); setStats(ns);
-    if(res==='W') confetti(1000);
-    setOverlay(w===3?'draw':(res==='W'?'win':'lose'));
-  // eslint-disable-next-line
-  },[over,screen]);
-
-  function decide(b,p,q){
-    const ms=moves(b); if(!ms.length) return null;
-    for(const c of ms) if(winner(drop(b,c,AI))===AI) return c;
-    for(const c of ms) if(winner(drop(b,c,HUMAN))===HUMAN) return c;
-    const depth=clamp(q.depth??p.aiConfig.depth,3,8), randomness=clamp(q.rand??p.aiConfig.randomness,0,0.6), style=q.style??p.aiConfig.style;
-    const scored=ms.map(col=>{const child=drop(b,col,AI); const {score}=minimax(child,Math.max(0,depth-1),false,style,p.humanColumnFreq); return {col,score:score-(p.humanColumnFreq[col]||0)*2};}).sort((a,b)=>b.score-a.score);
-    if(Math.random()<randomness && scored.length>1){ const i=Math.min(2,Math.floor(Math.random()*Math.min(3,scored.length))); return scored[i].col; }
-    return scored[0].col;
-  }
-
-  function human(col){
-    if(over) return;
-    if(screen==="vsai" && turn!==HUMAN) return;
-    const player=(screen==="local"?(turn===HUMAN?HUMAN:AI):HUMAN);
-    const nb=drop(board,col,player); if(!nb) return;
-    setBoard(nb);
-    if(screen==="vsai"){ setTurn(AI); const p={...profile}; p.humanColumnFreq[col]=(p.humanColumnFreq[col]||0)+1; saveProfile(p); setProfile(p); }
-    else { setTurn(turn===HUMAN?AI:HUMAN); }
-  }
-
-  function reset(){ setBoard(empty()); setTurn(HUMAN); setOverlay(null); }
-  function resetAll(){ saveProfile(defProfile()); saveStats(defStats()); setProfile(defProfile()); setStats(defStats()); reset(); }
-  function shareUrl(){ const u=new URL(location.href); u.searchParams.set("mm4","1"); u.searchParams.set("mode","streak"); u.searchParams.set("target",String(stats.bestStreak||1)); u.searchParams.set("depth",String(profile.aiConfig.depth)); u.searchParams.set("rand",String(profile.aiConfig.randomness)); u.searchParams.set("style",String(profile.aiConfig.style)); return u.toString(); }
-  async function share(){ const link=shareUrl(); if(navigator.share){ try{ await navigator.share({title:"MindMatch 4 — Challenge",text:`Beat my ${stats.bestStreak}-win streak!`,url:link}); return;}catch{} } await navigator.clipboard?.writeText(link); setToast("Challenge link copied!"); setTimeout(()=>setToast(null),1500); }
-
-  /* ---------- screens ---------- */
-  if(screen==="menu"){
-    return (
-      <div ref={rootRef} style={ui.page}>
-        <header className="mm4-header" style={ui.header}>
-          <img src="/logo-128.png" alt="MindMatch 4 logo" width="40" height="40" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
-        </header>
-
-        <main style={ui.menuMain}>
-          <div style={ui.titleWrap}>
-            <h1 style={ui.h1}>MindMatch 4</h1>
-            <div style={ui.tagline}>Beat the adaptive AI.</div>
-          </div>
-
-          <div style={ui.menuButtons}>
-            <button style={{...ui.btn,background:"#22c55e"}} onClick={()=>{setScreen("vsai"); reset();}}>Play vs AI</button>
-            <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setScreen("local"); reset();}}>Multiplayer (Local)</button>
-          </div>
-
-          <div style={ui.row}>
-            <label style={{...ui.muted,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
-              Theme
-              <select value={theme} onChange={e=>setTheme(e.target.value)} style={ui.select}>
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
-            </label>
-          </div>
-
-          <section style={ui.help}>
-            <h2 style={ui.h2}>How to win</h2>
-            <div style={ui.steps} className="mm4-help-steps">
-              <HowTo img="/howto-win-horizontal.gif" text="Horizontal — four across."/>
-              <HowTo img="/howto-win-vertical.gif" text="Vertical — four stacked."/>
-              <HowTo img="/howto-win-diagonal.gif" text="Diagonal — four in a slope."/>
-            </div>
-          </section>
-
-          <div style={{...ui.menuFoot,marginTop:8}}>
-            <div style={{...ui.muted,fontSize:12}}>“Multiplayer (Local)” is hot‑seat on the same device. Online rooms (Firebase/WebRTC) can be added later.</div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // Game
-  return (
-    <div ref={rootRef} style={ui.page}>
-      <header className="mm4-header" style={ui.header}>
-        <img src="/logo-128.png" alt="MindMatch 4 logo" width="36" height="36" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
-        <div style={{textAlign:"center",flex:1}}>
-          <div style={ui.h1Small}>MindMatch 4</div>
-          <div style={ui.taglineSmall}>{screen==="vsai" ? "Beat the adaptive AI." : "Local hot‑seat: P1 vs P2"}</div>
-        </div>
-        <div style={ui.rowRight}>
-          <select value={theme} onChange={e=>setTheme(e.target.value)} style={ui.select}>
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-          <button style={{...ui.btn,background:"#ef4444"}} onClick={()=>{setScreen("menu");}}>Home</button>
-        </div>
-      </header>
-
-      <div className="mm4-status" style={ui.status}>
-        <div style={{fontWeight:700}}>{status}</div>
-        <div style={{...ui.muted,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-          {screen==="vsai" ? <>Depth <b>{profile.aiConfig.depth}</b> · RNG <b>{Math.round(profile.aiConfig.randomness*100)}%</b> · Style <b>{profile.aiConfig.style}</b> · </> : null}
-          Rating <b>{stats.rating}</b> · Best Streak <b>{stats.bestStreak}</b>
-        </div>
-      </div>
-
-      <main className="mm4-main" style={ui.main}>
-        <section ref={boardPanelRef} style={ui.panel}>
-          <div style={ui.boardWrap}>
-            <div style={ui.boardFrame}>
-              <div style={ui.boardGrid}>
-                {Array.from({length:COLS}).map((_,c)=>{
-                  const col=[...board.map(r=>r[c])].reverse();
-                  return (
-                    <button key={c} style={ui.colBtn} onClick={()=>human(c)} title={`Drop in column ${c+1}`} disabled={!!winner(board)}>
-                      {col.map((cell,i)=>(
-                        <div key={i} style={ui.cell}>
-                          <div style={{
-                            ...ui.disc,
-                            background: cell===HUMAN? "var(--red)" : cell===AI? "var(--yellow)" : "transparent",
-                            boxShadow: cell? "inset 0 6px 12px rgba(0,0,0,.35)":"none"
-                          }}/>
-                        </div>
-                      ))}
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={ui.holes} aria-hidden="true"></div>
-            </div>
-          </div>
-          <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:8,flexWrap:"wrap"}}>
-            <button style={{...ui.btn,background:"#38bdf8"}} onClick={reset}>New Game</button>
-            <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
-            <button style={{...ui.btn,background:"#ef4444"}} onClick={resetAll}>Reset Profile</button>
-          </div>
-        </section>
-
-        <aside style={{...ui.panel,overflow:"auto"}}>
-          <h3 style={{marginTop:0}}>Stats</h3>
-          <div style={{fontSize:14,lineHeight:1.6}}>
-            <div><span style={ui.muted}>Games:</span> {stats.games}</div>
-            <div><span style={ui.muted}>Wins:</span> {stats.wins} · <span style={ui.muted}>Losses:</span> {stats.losses} · <span style={ui.muted}>Draws:</span> {stats.draws}</div>
-            <div><span style={ui.muted}>Recent:</span> {profile.lastTen.join(" ")||"—"}</div>
-          </div>
-          <h4 style={{margin:"16px 0 8px"}}>Your Column Preferences</h4>
-          <div style={ui.bars}>
-            {profile.humanColumnFreq.map((f,i,arr)=>{
-              const total=Math.max(1,arr.reduce((a,b)=>a+b,0));
-              const h=(f/total)*100;
-              return (
-                <div key={i} style={ui.bar}>
-                  <div style={ui.barOuter}><div style={{...ui.barInner,height:`${h}%`}}/></div>
-                  <div style={{textAlign:"center",fontSize:12,marginTop:6}}>{i+1}</div>
-                </div>
-              );
-            })}
-          </div>
-          <h4 style={{margin:"18px 0 8px"}}>Name</h4>
-          <input value={name} onChange={e=>{setName(e.target.value); localStorage.setItem(LS_NAME,e.target.value);}} placeholder="Your name" style={ui.input}/>
-        </aside>
-      </main>
-
-      {overlay && (
-        <div style={{...ui.overlay,zIndex:60}}>
-          <div style={ui.card}>
-            <div style={{fontSize:26,fontWeight:800,marginBottom:8}}>
-              {overlay==='win'?"You win! 🎉":overlay==='lose'?"You lost":"Draw"}
-            </div>
-            <div style={{...ui.muted,marginBottom:10}}>
-              {overlay==='win' ? "Nice! Try to push your streak." : overlay==='lose' ? "Go again—you’ll get it." : "Evenly matched!"}
-            </div>
-            <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-              <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setOverlay(null); reset();}}>Play Again</button>
-              <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {toast && <div style={ui.toast}>{toast}</div>}
-    </div>
-  );
-}
-
-/* ---------- HowTo card ---------- */
-function HowTo({img,text}){
-  const [ok,setOk]=useState(true);
-  return (
-    <div style={ui.step}>
-      <div style={ui.stepMedia}>
-        {ok ? <img src={img} alt="" onError={()=>setOk(false)} style={ui.gif}/> :
-          <div style={{...ui.gif,display:"grid",placeItems:"center",color:"var(--muted)",fontSize:12}}>(Add {img})</div>}
-      </div>
-      <div style={ui.stepText}>{text}</div>
-    </div>
-  );
-}
-
-/* ---------- UI styles ---------- */
-const ui={
-  page:{minHeight:"100svh",background:"linear-gradient(180deg,var(--bg2),var(--bg))",color:"var(--ink)",overflow:"hidden"},
-  header:{display:"flex",alignItems:"center",gap:12,padding:"10px 12px"},
-  h1:{margin:"0 0 6px",fontSize:32,fontWeight:900,textAlign:"center"},
-  h2:{margin:"14px 0 8px",fontSize:20},
-  tagline:{textAlign:"center",color:"var(--muted)"},
-  h1Small:{fontSize:20,fontWeight:800,lineHeight:1},
-  taglineSmall:{fontSize:12,color:"var(--muted)"},
-  row:{display:"flex",gap:8,alignItems:"center",justifyContent:"center",marginTop:14},
-  rowRight:{display:"flex",gap:8,alignItems:"center"},
-  btn:{border:0,padding:"10px 14px",borderRadius:12,color:"#fff",fontWeight:700,cursor:"pointer"},
-  select:{border:"1px solid var(--panel-border)",background:"var(--panel)",color:"var(--ink)",borderRadius:10,padding:"8px 10px",fontWeight:600},
-  muted:{color:"var(--muted)"},
-  menuMain:{display:"grid",gridTemplateRows:"auto auto auto 1fr",gap:12,height:"calc(100svh - 64px)",padding:"0 12px",overflow:"hidden"},
-  titleWrap:{marginTop:4},
-  menuButtons:{display:"flex",gap:10,justifyContent:"center",marginTop:8,flexWrap:"wrap"},
-  help:{background:"var(--panel)",border:"1px solid var(--panel-border)",borderRadius:16,padding:12,overflow:"auto"},
-  steps:{display:"grid",gridTemplateColumns:"1fr",gap:12},
-  step:{display:"grid",gridTemplateColumns:"160px 1fr",gap:12,alignItems:"center"},
-  stepMedia:{width:160,height:90,overflow:"hidden",borderRadius:10,border:"1px solid var(--panel-border)"},
-  gif:{width:"100%",height:"100%",objectFit:"cover"},
-  stepText:{fontSize:14},
-  menuFoot:{display:"grid",placeItems:"center"},
-  status:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 12px 6px"},
-  main:{maxWidth:1200,margin:"0 auto",padding:"0 12px",display:"grid",gridTemplateColumns:"1fr",gap:12,height:"calc(100svh - 136px)"},
-  panel:{background:"var(--panel)",border:"1px solid var(--panel-border)",borderRadius:16,padding:12,boxShadow:"0 10px 30px rgba(0,0,0,.12)",minHeight:0,overflow:"hidden"},
-  /* Board */
-  boardWrap:{display:"grid",placeItems:"center",height:"100%"},
-  boardFrame:{position:"relative",borderRadius:16,padding:"calc(var(--gap)*.6)",background:"linear-gradient(180deg,#0b162b,#0a1222)",height:"100%",width:"fit-content",maxWidth:"100%"},
-  boardGrid:{position:"relative",display:"grid",gridTemplateColumns:"repeat(7,var(--cell))",gap:"var(--gap)",padding:"var(--gap)",borderRadius:12,background:"var(--bg2)"},
-  holes:{position:"absolute",inset:0,pointerEvents:"none",borderRadius:12,boxShadow:"inset 0 0 0 2px var(--grid), inset 0 6px 18px rgba(0,0,0,.35)"},
-  colBtn:{display:"flex",flexDirection:"column",justifyContent:"flex-end",gap:"var(--gap)",background:"transparent",border:0,cursor:"pointer",padding:0},
-  cell:{width:"var(--cell)",height:"var(--cell)",borderRadius:"50%",display:"grid",placeItems:"center",background:"radial-gradient(circle at 50% 50%, var(--hole) 62%, transparent 63%)",boxShadow:"inset 0 0 0 1px var(--grid)"},
-  disc:{width:"calc(var(--cell) - var(--disc-pad))",height:"calc(var(--cell) - var(--disc-pad))",borderRadius:"50%",transition:"transform .2s ease"},
-  /* Stats */
-  bars:{display:"flex",gap:6,alignItems:"end"},
-  bar:{flex:1},
-  barOuter:{height:64,background:"rgba(148,163,184,.35)",borderRadius:"6px 6px 0 0",overflow:"hidden",display:"flex",alignItems:"end"},
-  barInner:{width:"100%",background:"var(--green)"},
-  input:{padding:"8px 10px",borderRadius:10,border:"1px solid var(--panel-border)",background:"var(--panel)",color:"var(--ink)",width:"100%"},
-  /* Overlay & toast */
-  overlay:{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"grid",placeItems:"center",padding:16},
-  card:{background:"var(--panel)",color:"var(--ink)",padding:18,borderRadius:16,border:"1px solid var(--panel-border)",width:"92%",maxWidth:460,textAlign:"center"},
-  toast:{position:"fixed",bottom:16,left:"50%",transform:"translateX(-50%)",background:"var(--panel)",color:"var(--ink)",padding:"8px 12px",border:"1px solid var(--panel-border)",borderRadius:10}
+    document.documentElement.setAttribute("data-theme", mode);
 };
 
-// desktop layout
-const styleEl=document.createElement("style");
-styleEl.textContent=`@media (min-width:900px){ .mm4-main{grid-template-columns:minmax(0,1fr) 320px;} .mm4-help-steps{grid-template-columns:repeat(3,1fr);} }`;
-document.head.appendChild(styleEl);
+const useTheme = () => {
+    const cached = localStorage.getItem(LS_THEME);
+    const init = (cached === "light" || cached === "dark" || cached === "system") ? cached : "system";
+    const [mode, setMode] = useState(init);
+    useEffect(() => {
+        applyTheme(mode);
+        localStorage.setItem(LS_THEME, mode || "system");
+    }, [mode]);
+    return [mode, setMode];
+};
+
+// --- Storage & Profile Management ---
+const defProfile = () => ({
+    humanColumnFreq: Array(COLS).fill(0),
+    lastTen: [],
+    aiConfig: { depth: 4, randomness: 0.2, style: "balanced" }
+});
+
+const loadProfile = () => {
+    try {
+        const s = localStorage.getItem(LS_PROFILE);
+        if (!s) return defProfile();
+        const p = JSON.parse(s);
+        return { ...defProfile(), ...p, aiConfig: { ...defProfile().aiConfig, ...(p.aiConfig || {}) } };
+    } catch {
+        return defProfile();
+    }
+};
+
+const saveProfile = (p) => localStorage.setItem(LS_PROFILE, JSON.stringify(p));
+
+const defStats = () => ({
+    games: 0, wins: 0, losses: 0, draws: 0, bestStreak: 0, curStreak: 0, rating: 1200
+});
+
+const loadStats = () => {
+    try {
+        return JSON.parse(localStorage.getItem(LS_STATS)) || defStats();
+    } catch {
+        return defStats();
+    }
+};
+
+const saveStats = (s) => localStorage.setItem(LS_STATS, JSON.stringify(s));
+
+// --- AI Logic (Minimax with Alpha-Beta Pruning) ---
+const evalWin = (window, player) => {
+    const opponent = player === AI ? HUMAN : AI;
+    const playerCount = window.filter(x => x === player).length;
+    const opponentCount = window.filter(x => x === opponent).length;
+    const emptyCount = window.filter(x => x === 0).length;
+
+    if (playerCount === 4) return 100000;
+    if (playerCount === 3 && emptyCount === 1) return 200;
+    if (playerCount === 2 && emptyCount === 2) return 40;
+    if (opponentCount === 3 && emptyCount === 1) return -180;
+    if (opponentCount === 2 && emptyCount === 2) return -30;
+    return 0;
+};
+
+const scorePosition = (board, player, style = "balanced") => {
+    let score = 0;
+    const center = Math.floor(COLS / 2);
+    
+    // Center column bias
+    for (let r = 0; r < ROWS; r++) {
+        if (board[r][center] === player) score += 8;
+    }
+
+    // Evaluate all 4-cell windows
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+            score += evalWin([board[r][c], board[r][c + 1], board[r][c + 2], board[r][c + 3]], player);
+        }
+    }
+    for (let c = 0; c < COLS; c++) {
+        for (let r = 0; r < ROWS - 3; r++) {
+            score += evalWin([board[r][c], board[r + 1][c], board[r + 2][c], board[r + 3][c]], player);
+        }
+    }
+    for (let r = 0; r < ROWS - 3; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+            score += evalWin([board[r][c], board[r + 1][c + 1], board[r + 2][c + 2], board[r + 3][c + 3]], player);
+        }
+    }
+    for (let r = 3; r < ROWS; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+            score += evalWin([board[r][c], board[r - 1][c + 1], board[r - 2][c + 2], board[r - 3][c + 3]], player);
+        }
+    }
+
+    if (style === "aggressive") score *= 1.08;
+    else if (style === "defensive") score *= 0.98;
+    return score;
+};
+
+const checkWin = (board, player) => {
+    // Horizontal check
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+            if (board[r][c] === player && board[r][c + 1] === player && board[r][c + 2] === player && board[r][c + 3] === player) {
+                return true;
+            }
+        }
+    }
+    // Vertical check
+    for (let c = 0; c < COLS; c++) {
+        for (let r = 0; r < ROWS - 3; r++) {
+            if (board[r][c] === player && board[r + 1][c] === player && board[r + 2][c] === player && board[r + 3][c] === player) {
+                return true;
+            }
+        }
+    }
+    // Diagonal (down-right) check
+    for (let r = 0; r < ROWS - 3; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+            if (board[r][c] === player && board[r + 1][c + 1] === player && board[r + 2][c + 2] === player && board[r + 3][c + 3] === player) {
+                return true;
+            }
+        }
+    }
+    // Diagonal (up-right) check
+    for (let r = 3; r < ROWS; r++) {
+        for (let c = 0; c < COLS - 3; c++) {
+            if (board[r][c] === player && board[r - 1][c + 1] === player && board[r - 2][c + 2] === player && board[r - 3][c + 3] === player) {
+                return true;
+            }
+        }
+    }
+    return false;
+};
+
+const isBoardFull = (board) => board[0].every(cell => cell !== 0);
+
+const minimax = (board, depth, isMaximizing, style, bias, alpha = -Infinity, beta = Infinity) => {
+    const terminal = checkWin(board, HUMAN) || checkWin(board, AI) || isBoardFull(board);
+    if (depth === 0 || terminal) {
+        if (checkWin(board, AI)) return { score: 1e9 };
+        if (checkWin(board, HUMAN)) return { score: -1e9 };
+        if (isBoardFull(board)) return { score: 0 };
+        return { score: scorePosition(board, AI, style) };
+    }
+
+    const availableMoves = board[0].map((_, c) => c).filter(c => board[0][c] === 0);
+    const moves = availableMoves.sort((a, b) => Math.abs(a - 3) - Math.abs(b - 3));
+    const penalty = c => (bias[c] || 0) * 1.5;
+
+    if (isMaximizing) {
+        let best = { score: -Infinity, col: moves[0] };
+        for (const c of moves) {
+            const tempBoard = clone(board);
+            let r = tempBoard.map((row, i) => i).reverse().find(i => tempBoard[i][c] === 0);
+            if (r === undefined) continue;
+            tempBoard[r][c] = AI;
+            const { score } = minimax(tempBoard, depth - 1, false, style, bias, alpha, beta);
+            const finalScore = score - penalty(c);
+            if (finalScore > best.score) {
+                best = { score: finalScore, col: c };
+            }
+            alpha = Math.max(alpha, finalScore);
+            if (beta <= alpha) break;
+        }
+        return best;
+    } else {
+        let best = { score: Infinity, col: moves[0] };
+        for (const c of moves) {
+            const tempBoard = clone(board);
+            let r = tempBoard.map((row, i) => i).reverse().find(i => tempBoard[i][c] === 0);
+            if (r === undefined) continue;
+            tempBoard[r][c] = HUMAN;
+            const { score } = minimax(tempBoard, depth - 1, true, style, bias, alpha, beta);
+            const finalScore = score + penalty(c);
+            if (finalScore < best.score) {
+                best = { score: finalScore, col: c };
+            }
+            beta = Math.min(beta, finalScore);
+            if (beta <= alpha) break;
+        }
+        return best;
+    }
+};
+
+// --- Game Adaptation & Stats ---
+const adapt = (profile, stats) => {
+    const winRate = (stats.wins || 0) / Math.max(1, stats.games || 0);
+    const streaky = (stats.curStreak || 0) >= 3;
+    const depth = Math.round(3 + 4 * clamp(winRate * 1.4, 0, 1));
+    const randomness = Math.max(0.05, 0.35 - winRate * 0.4 - (streaky ? 0.08 : 0));
+    const centerFreq = (profile.humanColumnFreq[3] || 0) + (profile.humanColumnFreq[2] || 0) + (profile.humanColumnFreq[4] || 0);
+    const edgeFreq = (profile.humanColumnFreq[0] || 0) + (profile.humanColumnFreq[1] || 0) + (profile.humanColumnFreq[5] || 0) + (profile.humanColumnFreq[6] || 0);
+    profile.aiConfig = {
+        depth,
+        randomness: Number(randomness.toFixed(2)),
+        style: centerFreq >= edgeFreq ? "defensive" : "aggressive"
+    };
+    return profile;
+};
+
+const updateStats = (stats, result) => {
+    const newStats = { ...stats };
+    newStats.games++;
+    if (result === 'W') {
+        newStats.wins++;
+        newStats.curStreak++;
+        newStats.bestStreak = Math.max(newStats.bestStreak, newStats.curStreak);
+        newStats.rating += 12 + Math.max(0, 6 - Math.floor(newStats.curStreak / 2));
+    } else if (result === 'L') {
+        newStats.losses++;
+        newStats.curStreak = 0;
+        newStats.rating -= 10;
+    } else {
+        newStats.draws++;
+        newStats.rating -= 2;
+    }
+    newStats.rating = clamp(Math.round(newStats.rating), 600, 3000);
+    return newStats;
+};
+
+// --- UI Components ---
+const Board = ({ board, onDrop, disabled }) => {
+    const handleMouseUp = (e) => {
+        if (disabled) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const colWidth = rect.width / COLS;
+        const col = Math.floor(x / colWidth);
+        onDrop(col);
+    };
+
+    return (
+        <div
+            className="grid gap-2 p-2 rounded-xl bg-gray-700 aspect-square w-full"
+            style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}
+            onMouseUp={handleMouseUp}
+        >
+            {board.map((row, r) =>
+                row.map((cell, c) => (
+                    <div
+                        key={`${r}-${c}`}
+                        className="bg-white rounded-full aspect-square relative"
+                    >
+                        {cell !== 0 && (
+                            <div className={`absolute inset-1 rounded-full animate-drop-${r} ${cell === HUMAN ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
+                        )}
+                    </div>
+                ))
+            )}
+        </div>
+    );
+};
+
+const StatsPanel = ({ stats, userId, playerName }) => {
+    const formatRating = (rating) => {
+        if (rating === 3000) return "Master";
+        if (rating >= 2000) return "Expert";
+        if (rating >= 1500) return "Advanced";
+        return "Novice";
+    }
+
+    return (
+        <div className="p-4 bg-gray-800 text-white rounded-xl shadow-lg flex flex-col gap-4">
+            <h2 className="text-xl font-bold">Player Stats</h2>
+            <p className="text-sm">User ID: <span className="font-mono text-xs">{userId || 'Loading...'}</span></p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>Games Played: {stats.games}</div>
+                <div>Wins: {stats.wins}</div>
+                <div>Losses: {stats.losses}</div>
+                <div>Draws: {stats.draws}</div>
+                <div>Current Streak: {stats.curStreak}</div>
+                <div>Best Streak: {stats.bestStreak}</div>
+                <div>Rating: {stats.rating} ({formatRating(stats.rating)})</div>
+            </div>
+            <p className="text-sm text-center mt-2 opacity-70">
+                Play more games to see your stats change!
+            </p>
+        </div>
+    );
+};
+
+const Leaderboard = ({ leaders }) => {
+    return (
+        <div className="p-4 bg-gray-800 text-white rounded-xl shadow-lg">
+            <h2 className="text-xl font-bold mb-4">Global Leaderboard</h2>
+            <ul className="space-y-2">
+                {leaders.length > 0 ? (
+                    leaders.map((leader, index) => (
+                        <li key={leader.id} className="flex justify-between items-center bg-gray-700 p-2 rounded-md">
+                            <div className="flex items-center gap-2">
+                                <span className="font-bold text-lg">{index + 1}.</span>
+                                <span className="truncate">{leader.name || 'Anonymous'}</span>
+                            </div>
+                            <span className="font-semibold text-lg">{leader.stats.rating}</span>
+                        </li>
+                    ))
+                ) : (
+                    <li className="text-sm opacity-70">Loading leaderboard...</li>
+                )}
+            </ul>
+        </div>
+    );
+};
+
+const Confetti = () => (
+    <div className="confetti-container">
+        {Array.from({ length: 50 }).map((_, i) => (
+            <div
+                key={i}
+                className="confetti-piece"
+                style={{
+                    left: `${Math.random() * 100}%`,
+                    animationDelay: `${Math.random() * 1.5}s`,
+                    backgroundColor: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                }}
+            ></div>
+        ))}
+    </div>
+);
+
+// --- Main App Component ---
+export default function App() {
+    // State management for game and UI
+    const [theme, setTheme] = useTheme();
+    const [screen, setScreen] = useState("menu");
+    const [board, setBoard] = useState(empty());
+    const [turn, setTurn] = useState(HUMAN);
+    const [status, setStatus] = useState("Your turn");
+    const [profile, setProfile] = useState(loadProfile);
+    const [stats, setStats] = useState(loadStats);
+    const [name, setName] = useState(() => localStorage.getItem(LS_NAME) || "Player");
+    const [overlay, setOverlay] = useState(false);
+    const [showConfetti, setShowConfetti] = useState(false);
+    const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+    const [userId, setUserId] = useState(null);
+    const [leaders, setLeaders] = useState([]);
+    
+    const boardPanelRef = useRef(null);
+
+    const isGameOver = useMemo(() => {
+        return checkWin(board, HUMAN) || checkWin(board, AI) || isBoardFull(board);
+    }, [board]);
+
+    // --- Firebase Init & State Management ---
+    useEffect(() => {
+        let unsubscribe = () => {};
+        
+        const initFirebase = async () => {
+            try {
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const db = getFirestore(app);
+
+                // Sign in with custom token if available, otherwise anonymously
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        setUserId(user.uid);
+                        setIsFirebaseReady(true);
+                        
+                        // Check if the user has a profile, create one if not
+                        const userDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/profile`, 'stats');
+                        const userDocSnap = await getDoc(userDocRef);
+                        
+                        if (!userDocSnap.exists()) {
+                            await setDoc(userDocRef, { name: name, stats: stats, createdAt: serverTimestamp() });
+                        }
+
+                        // Set up leaderboard listener
+                        const leaderboardCollection = collection(db, `artifacts/${appId}/public/data/leaderboard`);
+                        const q = query(leaderboardCollection, orderBy('stats.rating', 'desc'), limit(10));
+                        unsubscribe = onSnapshot(q, (querySnapshot) => {
+                            const newLeaders = querySnapshot.docs.map(d => ({
+                                id: d.id,
+                                ...d.data()
+                            }));
+                            setLeaders(newLeaders);
+                        });
+
+                    } else {
+                        setUserId(null);
+                        setIsFirebaseReady(true);
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+            }
+        };
+
+        initFirebase();
+
+        // Cleanup listener on component unmount
+        return () => unsubscribe();
+    }, [name, stats]);
+
+    // --- Game Logic Functions ---
+    const dropDisc = useCallback((col, player) => {
+        const newBoard = clone(board);
+        for (let r = ROWS - 1; r >= 0; r--) {
+            if (newBoard[r][col] === 0) {
+                newBoard[r][col] = player;
+                return newBoard;
+            }
+        }
+        return null;
+    }, [board]);
+
+    const handlePlayerMove = useCallback((col) => {
+        if (turn !== HUMAN || isGameOver || !board[0][col] === 0) return;
+
+        // Update profile with column choice
+        const newProfile = { ...profile };
+        newProfile.humanColumnFreq[col]++;
+        saveProfile(newProfile);
+        setProfile(newProfile);
+
+        const newBoard = dropDisc(col, HUMAN);
+        if (newBoard) {
+            setBoard(newBoard);
+            setTurn(AI);
+            setStatus("AI is thinking...");
+        }
+    }, [turn, isGameOver, profile, dropDisc, board]);
+    
+    const handleGameEnd = useCallback(async (winner) => {
+        let result = 'D';
+        if (winner === HUMAN) {
+            setStatus("You win! 🎉");
+            setShowConfetti(true);
+            result = 'W';
+        } else if (winner === AI) {
+            setStatus("AI wins... try again!");
+            result = 'L';
+        } else {
+            setStatus("It's a draw!");
+        }
+        
+        // Update local stats and profile
+        const newStats = updateStats(stats, result);
+        saveStats(newStats);
+        setStats(newStats);
+
+        const newProfile = adapt(profile, newStats);
+        saveProfile(newProfile);
+        setProfile(newProfile);
+
+        // Update Firestore if user is authenticated
+        if (userId && isFirebaseReady) {
+            const userDocRef = doc(getFirestore(), `artifacts/${appId}/users/${userId}/profile`, 'stats');
+            await setDoc(userDocRef, { name: name, stats: newStats, lastPlayed: serverTimestamp() }, { merge: true });
+
+            // Also update the public leaderboard
+            const publicDocRef = doc(getFirestore(), `artifacts/${appId}/public/data/leaderboard`, userId);
+            await setDoc(publicDocRef, { name: name, stats: newStats, lastPlayed: serverTimestamp() }, { merge: true });
+        }
+        setOverlay(true);
+    }, [stats, profile, userId, isFirebaseReady, name]);
+
+    // --- AI Turn Logic ---
+    useEffect(() => {
+        if (turn !== AI || isGameOver) return;
+        
+        setOverlay(true);
+        const { depth, randomness, style } = profile.aiConfig;
+        
+        const aiMoveTimer = setTimeout(() => {
+            let bestCol;
+            if (Math.random() < randomness) {
+                // Take a random move for fun/variety
+                const moves = board[0].map((_, c) => c).filter(c => board[0][c] === 0);
+                bestCol = moves[Math.floor(Math.random() * moves.length)];
+            } else {
+                // Use minimax for a strategic move
+                const { col } = minimax(board, depth, true, style, profile.humanColumnFreq);
+                bestCol = col;
+            }
+
+            const newBoard = dropDisc(bestCol, AI);
+            if (newBoard) {
+                setBoard(newBoard);
+                setTurn(HUMAN);
+                setStatus("Your turn");
+            }
+            setOverlay(false);
+        }, 1000); // Simulate AI thinking time
+
+        return () => clearTimeout(aiMoveTimer);
+    }, [turn, isGameOver, profile, board, dropDisc]);
+
+    // Check for win/draw after each move
+    useEffect(() => {
+        if (!isGameOver) return;
+        
+        const humanWin = checkWin(board, HUMAN);
+        const aiWin = checkWin(board, AI);
+        
+        if (humanWin) {
+            handleGameEnd(HUMAN);
+        } else if (aiWin) {
+            handleGameEnd(AI);
+        } else {
+            handleGameEnd(0); // Draw
+        }
+    }, [isGameOver, board, handleGameEnd]);
+
+    // --- UI/Layout Effects ---
+    useEffect(() => {
+        function fit() {
+            const root = document.body;
+            const panel = boardPanelRef.current;
+            if (!root || !panel) return;
+
+            const styles = getComputedStyle(document.documentElement);
+            const gap = parseFloat(styles.getPropertyValue("--gap")) || 10;
+            const headerH = document.querySelector(".mm4-header")?.getBoundingClientRect().height || 0;
+            const statusH = document.querySelector(".mm4-status")?.getBoundingClientRect().height || 0;
+            const vw = Math.max(innerWidth, document.documentElement.clientWidth);
+            const vh = Math.max(innerHeight, document.documentElement.clientHeight);
+            const isDesktop = vw >= 900;
+
+            const availH = vh - headerH - statusH - 24;
+            const panelRect = panel.getBoundingClientRect();
+            const availW = isDesktop ? panelRect.width : vw - 24;
+            const cellW = (availW - gap * (COLS - 1) - gap * 2) / COLS;
+            const cellH = (availH - gap * (ROWS - 1) - gap * 2) / ROWS;
+            let cell = Math.floor(Math.max(28, Math.min(cellW, cellH)));
+            cell = Math.min(cell, isDesktop ? 72 : 56);
+            document.documentElement.style.setProperty("--cell", `${cell}px`);
+        }
+        
+        const rafFit = () => requestAnimationFrame(() => requestAnimationFrame(fit));
+        rafFit();
+        const ro = new ResizeObserver(rafFit);
+        ro.observe(document.body);
+        window.addEventListener("resize", rafFit);
+        window.addEventListener("orientationchange", rafFit);
+        
+        return () => {
+            ro.disconnect();
+            window.removeEventListener("resize", rafFit);
+            window.removeEventListener("orientationchange", rafFit);
+        };
+    }, []);
+
+    // --- Main Render ---
+    return (
+        <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4 font-sans">
+            {showConfetti && <Confetti />}
+            <div className="w-full max-w-4xl p-6 bg-gray-800 rounded-3xl shadow-2xl flex flex-col md:flex-row gap-6">
+
+                {/* Left Panel: Stats & Controls */}
+                <div className="flex-1 flex flex-col items-center justify-start gap-4 p-4 md:p-0">
+                    <h1 className="text-4xl font-bold text-center">MindMatch 4</h1>
+                    <div className="mt-4 w-full flex flex-col gap-4">
+                        <StatsPanel stats={stats} userId={userId} playerName={name} />
+                        <Leaderboard leaders={leaders} />
+                    </div>
+                </div>
+
+                {/* Right Panel: Game Board */}
+                <div ref={boardPanelRef} className="flex-1 w-full flex flex-col items-center justify-center gap-4 relative">
+                    <div className="w-full text-center">
+                        <p className="text-xl font-semibold mm4-status">{status}</p>
+                    </div>
+                    <Board board={board} onDrop={handlePlayerMove} disabled={overlay} />
+                    <div className="flex flex-col gap-2 mt-4 w-full">
+                        <button
+                            onClick={() => {
+                                setScreen("vsai");
+                                setBoard(empty());
+                                setTurn(HUMAN);
+                                setStatus("Your turn");
+                                setOverlay(false);
+                                setShowConfetti(false);
+                            }}
+                            className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105"
+                        >
+                            Play vs AI
+                        </button>
+                        <button
+                            onClick={() => {
+                                setScreen("local");
+                                setBoard(empty());
+                                setTurn(HUMAN);
+                                setStatus("Player 1's turn");
+                                setOverlay(false);
+                                setShowConfetti(false);
+                            }}
+                            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105"
+                        >
+                            Local Multiplayer
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <style jsx global>{`
+                :root {
+                    --bg-color: #1a202c;
+                    --text-color: #e2e8f0;
+                    --container-bg: #2d3748;
+                    --board-bg: #4a5568;
+                    --board-border: #6b7280;
+                    --player1-color: #f56565;
+                    --player2-color: #ecc94b;
+                    --cell: 56px;
+                }
+
+                @media (prefers-color-scheme: light) {
+                    :root {
+                        --bg-color: #f0f4f8;
+                        --text-color: #1a202c;
+                        --container-bg: #ffffff;
+                        --board-bg: #cbd5e0;
+                        --board-border: #a0aec0;
+                        --player1-color: #e53e3e;
+                        --player2-color: #f6ad55;
+                    }
+                }
+
+                .bg-gray-900 { background-color: var(--bg-color); }
+                .bg-gray-800 { background-color: var(--container-bg); }
+                .text-white { color: var(--text-color); }
+                
+                @keyframes drop-0 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
+                @keyframes drop-1 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
+                @keyframes drop-2 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
+                @keyframes drop-3 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
+                @keyframes drop-4 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
+                @keyframes drop-5 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
+                
+                .animate-drop-0 { animation: drop-0 0.5s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
+                .animate-drop-1 { animation: drop-1 0.6s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
+                .animate-drop-2 { animation: drop-2 0.7s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
+                .animate-drop-3 { animation: drop-3 0.8s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
+                .animate-drop-4 { animation: drop-4 0.9s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
+                .animate-drop-5 { animation: drop-5 1.0s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
+
+                .confetti-container {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    pointer-events: none;
+                    overflow: hidden;
+                    z-index: 1000;
+                }
+                .confetti-piece {
+                    position: absolute;
+                    width: 10px;
+                    height: 10px;
+                    opacity: 0;
+                    animation: fall 2s ease-out forwards;
+                }
+                @keyframes fall {
+                    0% { transform: translate(0, -100vh) rotate(0deg); opacity: 1; }
+                    100% { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; }
+                }
+            `}</style>
+        </div>
+    );
+}
+
