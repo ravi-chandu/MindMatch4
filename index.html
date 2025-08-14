@@ -2,39 +2,64 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MindMatch 4 — Adaptive Connect Four</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a">
+    <title>MindMatch 4 — Adaptive Connect Four | Smart Mind Game that Learns You</title>
 
-    <!-- Optional: enable Firebase global leaderboard.
-         1) Uncomment the 3 scripts below
-         2) Paste your Firebase config into the window.MM4_FIREBASE_CONFIG object -->
-    <!--
-    <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-    <script defer src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
-    <script>
-      // REPLACE with your actual Firebase project keys to enable global leaderboard
-      window.MM4_FIREBASE_CONFIG = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT.firebaseapp.com",
-        projectId: "YOUR_PROJECT_ID",
-        // (Firestore only needs projectId; apiKey is needed by the SDK in browser)
-      };
+    <!-- SEO -->
+    <meta name="description" content="MindMatch 4 is an adaptive Connect Four mind game. The AI learns your playstyle, gets harder as you win, and lets you share challenges with friends." />
+    <meta name="keywords" content="mind games, connect four, adaptive ai game, strategy game online, brain games, multiplayer challenge, smart games, board games online" />
+    <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="MindMatch 4 — Adaptive Connect Four" />
+    <meta property="og:description" content="Beat the AI… if you can. It learns your strategy and gets tougher. Share a challenge link with friends!" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ravi-chandu.github.io/MindMatch4/" />
+    <meta property="og:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MindMatch 4 — Adaptive Connect Four" />
+    <meta name="twitter:description" content="An AI that learns your moves. Every win makes it stronger." />
+    <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
+
+    <!-- JSON‑LD: Game schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Game",
+      "name": "MindMatch 4",
+      "alternateName": "MindMatch Four",
+      "applicationCategory": "Game,OnlineGame",
+      "genre": ["Strategy","BoardGame","Mind game"],
+      "url": "https://ravi-chandu.github.io/MindMatch4/",
+      "description": "Adaptive Connect Four: the AI learns your playstyle and ramps difficulty. Share streak challenges with friends.",
+      "inLanguage": "en",
+      "publisher": { "@type": "Person", "name": "Ravi" }
+    }
     </script>
-    -->
+
+    <!-- Favicon (inline SVG so you get a crisp icon) -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230f172a'/%3E%3Ccircle cx='20' cy='20' r='8' fill='%23ef4444'/%3E%3Ccircle cx='32' cy='32' r='8' fill='%23fbbf24'/%3E%3Ccircle cx='44' cy='44' r='8' fill='%2338bdf8'/%3E%3Ctext x='6' y='60' font-size='16' fill='%23e2e8f0' font-family='Arial, sans-serif'%3E4%3C/text%3E%3C/svg%3E" />
+
     <style>
-      :root { --ink:#e2e8f0; --muted:#94a3b8; }
-      html, body, #root { height: 100%; }
-      body {
-        margin:0; background: linear-gradient(#0f172a,#0b1222);
-        color: var(--ink);
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans";
+      :root{
+        --bg:#0f172a; --bg2:#111827; --ink:#e5e7eb; --muted:#9ca3af;
+        --red:#ef4444; --yellow:#fbbf24; --blue:#38bdf8; --green:#22c55e;
+        /* responsive cell size for mobile-first UX */
+        --cell: clamp(38px, 12.5vw, 64px);
+        --gap: clamp(6px, 2vw, 12px);
       }
-      /* Confetti canvas sits above everything when active */
-      #mm4-confetti { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+      html,body,#root{height:100%}
+      body{margin:0;background:linear-gradient(180deg,#0f172a,#0b1222);color:var(--ink);
+        font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,'Helvetica Neue',Arial,'Noto Sans';}
+      #mm4-confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/index.jsx"></script>
+    <!-- IMPORTANT: relative path so Pages works -->
+    <script type="module" src="./index.jsx"></script>
   </body>
 </html>
