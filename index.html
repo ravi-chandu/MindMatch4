@@ -8,48 +8,38 @@
     <title>MindMatch 4 — Adaptive Connect Four | Smart Mind Game</title>
 
     <!-- SEO -->
-    <meta name="description" content="MindMatch 4 is an adaptive Connect Four mind game. The AI learns your style, gets harder as you win, and lets you share challenges with friends." />
-    <meta name="keywords" content="mind games, connect four, adaptive ai game, strategy game online, brain games, challenge friends" />
+    <meta name="description" content="MindMatch 4 is an adaptive Connect Four mind game. The AI learns your playstyle and gets harder as you win. Share challenges with friends."/>
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
 
-    <!-- Open Graph / Twitter -->
+    <!-- Social preview -->
     <meta property="og:title" content="MindMatch 4 — Adaptive Connect Four" />
-    <meta property="og:description" content="Beat the AI… if you can. It learns your strategy and gets tougher. Share a challenge link!" />
+    <meta property="og:description" content="Beat the AI… if you can. It learns your strategy and ramps up." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://ravi-chandu.github.io/MindMatch4/" />
     <meta property="og:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="MindMatch 4 — Adaptive Connect Four" />
-    <meta name="twitter:description" content="An AI that learns your moves. Every win makes it stronger." />
     <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
 
-    <!-- JSON-LD -->
-    <script type="application/ld+json">
-    {
-      "@context":"https://schema.org",
-      "@type":"Game",
-      "name":"MindMatch 4",
-      "applicationCategory":["Game","OnlineGame"],
-      "genre":["Strategy","BoardGame","Mind game"],
-      "url":"https://ravi-chandu.github.io/MindMatch4/",
-      "description":"Adaptive Connect Four: the AI learns your playstyle and ramps difficulty. Share streak challenges with friends.",
-      "inLanguage":"en",
-      "publisher":{"@type":"Person","name":"Ravi"}
-    }
-    </script>
+    <!-- Icons -->
+    <link rel="icon" type="image/x-icon" href="./favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./logo-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="./logo-64.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="./logo-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="./logo-512.png" />
 
-    <!-- Favicon/logo is an inline SVG (tiny + crisp) -->
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230f172a'/%3E%3Ccircle cx='22' cy='22' r='8' fill='%23ef4444'/%3E%3Ccircle cx='32' cy='32' r='8' fill='%23fbbf24'/%3E%3Ccircle cx='42' cy='42' r='8' fill='%2338bdf8'/%3E%3Ctext x='8' y='58' font-size='16' fill='%23e5e7eb' font-family='Arial'%3E4%3C/text%3E%3C/svg%3E"/>
-
-    <!-- Theme variables -->
+    <!-- Base theme variables -->
     <style>
       :root{
+        /* colors */
         --bg:#ffffff; --bg2:#f3f4f6; --ink:#111827; --muted:#6b7280;
-        --panel:rgba(255,255,255,.9); --panel-border:rgba(0,0,0,.08);
-        --cell: clamp(44px, 13vw, 64px);
-        --gap: clamp(6px, 2vw, 12px);
-        --red:#ef4444; --yellow:#fbbf24; --blue:#2563eb; --green:#16a34a;
+        --panel:rgba(255,255,255,.92); --panel-border:rgba(0,0,0,.08);
         --hole:#e5e7eb; --grid:#d1d5db;
+        --red:#ef4444; --yellow:#fbbf24; --green:#16a34a; --blue:#2563eb;
+
+        /* sizing (controlled by the size switcher) */
+        --cell: 56px;         /* disc diameter incl. margin zone */
+        --gap: 10px;          /* spacing between cells/columns */
+        --disc-pad: 10px;     /* hole→disc inset */
       }
       @media (prefers-color-scheme: dark){
         :root{
@@ -58,16 +48,25 @@
           --hole:#0f172a; --grid:#1f2937;
         }
       }
+      [data-theme="light"]{
+        --bg:#ffffff; --bg2:#f3f4f6; --ink:#111827; --muted:#6b7280;
+        --panel:rgba(255,255,255,.92); --panel-border:rgba(0,0,0,.08);
+        --hole:#e5e7eb; --grid:#d1d5db;
+      }
+      [data-theme="dark"]{
+        --bg:#0b1222; --bg2:#0f172a; --ink:#e5e7eb; --muted:#94a3b8;
+        --panel:rgba(17,24,39,.85); --panel-border:rgba(255,255,255,.08);
+        --hole:#0f172a; --grid:#1f2937;
+      }
+
       html,body,#root{height:100%}
       body{
-        margin:0;
-        background:linear-gradient(180deg,var(--bg2),var(--bg));
-        color:var(--ink);
+        margin:0; background:linear-gradient(180deg,var(--bg2),var(--bg)); color:var(--ink);
         font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
         padding-top: env(safe-area-inset-top, 0);
       }
-      /* Confetti canvas (z-index lower than the result overlay) */
-      #mm4-confetti{position:fixed; inset:0; pointer-events:none; z-index:40;}
+      /* Confetti sits below overlay */
+      #mm4-confetti{ position:fixed; inset:0; pointer-events:none; z-index:40; }
     </style>
   </head>
   <body>
