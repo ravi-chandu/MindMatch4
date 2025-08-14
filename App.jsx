@@ -1,28 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-/** MindMatch 4 (mobile-first, single-screen)
- *  - Home screen: Play vs AI, Multiplayer (Local Hot‑Seat)
- *  - Auto-fit board (no scroll): computes --cell from viewport + panel sizes
- *  - Stats on right (desktop), below board (mobile)
- *  - System theme by default + manual switch
- *  - Uses your logo files (logo-128.png, etc.)
- */
+/** MindMatch 4 — stable layout, system theme by default, instructions with GIF fallbacks */
 
 const ROWS=6, COLS=7, HUMAN=1, AI=2;
-const LS_PROFILE="mm4_profile_v5";
-const LS_STATS="mm4_stats_v5";
+const LS_PROFILE="mm4_profile_v6";
+const LS_STATS="mm4_stats_v6";
 const LS_NAME="mm4_name";
-const LS_THEME="mm4_theme";  // "system" | "light" | "dark"
+const LS_THEME="mm4_theme"; // "system" | "light" | "dark"
 
 const clone=b=>b.map(r=>r.slice());
 const empty=()=>Array.from({length:ROWS},()=>Array(COLS).fill(0));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ASSET = (p)=> new URL(p, import.meta.env.BASE_URL).toString();
 
-/* ---------- theme ---------- */
-function applyTheme(mode){ if(mode==="system"){ document.documentElement.removeAttribute("data-theme"); return; } document.documentElement.setAttribute("data-theme", mode); }
+/* ---------- theme (system by default) ---------- */
+function applyTheme(mode){
+  if(mode==="system" || !mode){ document.documentElement.removeAttribute("data-theme"); return; }
+  document.documentElement.setAttribute("data-theme", mode);
+}
 function useTheme(){
-  const [mode,setMode]=useState(()=>localStorage.getItem(LS_THEME)||"system");
-  useEffect(()=>{applyTheme(mode); localStorage.setItem(LS_THEME,mode);},[mode]);
+  // sanitize any stale values: default to "system"
+  const init = (()=> {
+    const t = localStorage.getItem(LS_THEME);
+    return (t==="light"||t==="dark"||t==="system") ? t : "system";
+  })();
+  const [mode,setMode]=useState(init);
+  useEffect(()=>{ applyTheme(mode); localStorage.setItem(LS_THEME, mode||"system"); },[mode]);
   return [mode,setMode];
 }
 
@@ -34,7 +37,7 @@ function defStats(){return{games:0,wins:0,losses:0,draws:0,bestStreak:0,curStrea
 function loadStats(){try{return JSON.parse(localStorage.getItem(LS_STATS))||defStats()}catch{return defStats()}}
 function saveStats(s){localStorage.setItem(LS_STATS, JSON.stringify(s))}
 
-/* ---------- helpers ---------- */
+/* ---------- misc ---------- */
 const parseQuery=()=>{const sp=new URLSearchParams(location.search); const q=Object.fromEntries(sp.entries()); ["target","depth","rand"].forEach(k=>q[k]=q[k]!==undefined?Number(q[k]):undefined); return q}
 
 /* ---------- board logic ---------- */
@@ -102,10 +105,10 @@ export default function App(){
   const query=useMemo(()=>parseQuery(),[]);
   const [theme,setTheme]=useTheme();
 
-  // home: "menu" | "vsai" | "local"
+  // "menu" | "vsai" | "local"
   const [screen,setScreen]=useState("menu");
 
-  // game state
+  // game
   const [board,setBoard]=useState(()=>empty());
   const [turn,setTurn]=useState(HUMAN);
   const [status,setStatus]=useState("Your turn");
@@ -118,55 +121,54 @@ export default function App(){
   const w = useMemo(()=>winner(board),[board]);
   const over = w!==0;
 
-  // auto-fit sizing: compute --cell so whole app fits 100svh without scroll
+  // fit board safely (after layout paints)
   const rootRef=useRef(null);
-  const boardBoxRef=useRef(null);
+  const boardPanelRef=useRef(null);
   useEffect(()=>{
     function fit(){
       const root = rootRef.current;
-      const box = boardBoxRef.current;
-      if(!root || !box) return;
+      const panel = boardPanelRef.current;
+      if(!root || !panel) return;
 
       const styles = getComputedStyle(document.documentElement);
       const gap = parseFloat(styles.getPropertyValue("--gap")) || 10;
-      const pad = gap*2; // board padding approx
 
-      const header = root.querySelector(".mm4-header")?.getBoundingClientRect().height || 0;
-      const status = root.querySelector(".mm4-status")?.getBoundingClientRect().height || 0;
+      const headerH = root.querySelector(".mm4-header")?.getBoundingClientRect().height || 0;
+      const statusH = root.querySelector(".mm4-status")?.getBoundingClientRect().height || 0;
 
-      const vh = Math.max(window.innerHeight, document.documentElement.clientHeight);
       const vw = Math.max(window.innerWidth, document.documentElement.clientWidth);
+      const vh = Math.max(window.innerHeight, document.documentElement.clientHeight);
 
-      // layout: on desktop we have stats on the right; on mobile stats are below
       const isDesktop = vw >= 900;
 
-      // available height for main content
-      const availH = vh - header - status - 16; // margins
-      // board container dims
-      const boxRect = box.getBoundingClientRect();
-      const availW = isDesktop ? (boxRect.width) : vw - 24;
+      // grid area height minus header/status/margins
+      const availH = vh - headerH - statusH - 24;        // total vertical space for main
+      // width for the board panel
+      const panelRect = panel.getBoundingClientRect();
+      const availW = isDesktop ? panelRect.width : vw - 24;
 
-      // compute max cell without scroll
-      const cellW = (availW - gap*(COLS-1) - pad) / COLS;
-      const cellH = (availH - gap*(ROWS-1) - pad) / ROWS;
+      // compute max cell size
+      const cellW = (availW - gap*(COLS-1) - gap*2) / COLS;
+      const cellH = (availH - gap*(ROWS-1) - gap*2) / ROWS;
       let cell = Math.floor(Math.max(28, Math.min(cellW, cellH)));
 
-      // prefer a bit smaller on phones for thumbs
-      if (!isDesktop) cell = Math.min(cell, 56);
+      // cap for phone thumbs, grow on desktop
+      cell = Math.min(cell, isDesktop ? 72 : 56);
 
       document.documentElement.style.setProperty("--cell", `${cell}px`);
       document.documentElement.style.setProperty("--disc-pad", `${Math.round(cell*0.18)}px`);
       document.documentElement.style.setProperty("--gap", `${Math.max(6, Math.round(cell*0.18))}px`);
     }
-    fit();
-    const ro = new ResizeObserver(fit);
+    const rafFit = ()=> requestAnimationFrame(()=>requestAnimationFrame(fit)); // wait 2 frames
+    rafFit();
+    const ro = new ResizeObserver(rafFit);
     ro.observe(document.body);
-    window.addEventListener("orientationchange", fit);
-    window.addEventListener("resize", fit);
-    return ()=>{ ro.disconnect(); window.removeEventListener("orientationchange",fit); window.removeEventListener("resize",fit); }
+    window.addEventListener("resize", rafFit);
+    window.addEventListener("orientationchange", rafFit);
+    return ()=>{ ro.disconnect(); window.removeEventListener("resize",rafFit); window.removeEventListener("orientationchange",rafFit); };
   },[]);
 
-  // adapt on mount
+  // adapt
   useEffect(()=>{const p=adapt({...profile},{...stats}); saveProfile(p); setProfile(p); /* eslint-disable-next-line */},[]);
 
   // AI move
@@ -182,12 +184,11 @@ export default function App(){
     return ()=>clearTimeout(t);
   },[turn,over,board,profile,query,screen]);
 
-  // status text
+  // status
   useEffect(()=>{
     if(screen==="menu"){ setStatus(""); return; }
-    if (w===HUMAN) setStatus("Player 1 wins! 🎉");
-    else if (w===AI && screen==="vsai") setStatus("AI wins 🤖");
-    else if (w===AI && screen==="local") setStatus("Player 2 wins! 🎉");
+    if (w===HUMAN) setStatus(screen==="vsai"?"You win! 🎉":"Player 1 wins! 🎉");
+    else if (w===AI) setStatus(screen==="vsai"?"AI wins 🤖":"Player 2 wins! 🎉");
     else if (w===3) setStatus("Draw");
     else setStatus(turn===HUMAN? (screen==="vsai"?"Your turn":"P1 turn") : (screen==="vsai"?"AI thinking…":"P2 turn"));
   },[turn,w,screen]);
@@ -197,7 +198,7 @@ export default function App(){
     if(screen==="menu" || !over) return;
     const res = (screen==="vsai")
       ? (w===HUMAN?'W':w===AI?'L':'D')
-      : (w===HUMAN?'W':'L'); // for local, treat P1 as HUMAN stats
+      : (w===HUMAN?'W':'L'); // treat P1 as HUMAN for stats
     const p={...profile, lastTen:[...profile.lastTen, (res==='W'?'W':'L')].slice(-10)};
     const ns=updStats(stats,res);
     adapt(p,ns); saveProfile(p); saveStats(ns); setProfile(p); setStats(ns);
@@ -219,13 +220,11 @@ export default function App(){
   function human(col){
     if (over) return;
     if (screen==="vsai" && turn!==HUMAN) return;
-    if (screen==="local" && turn!==HUMAN && turn!==AI) return;
-
     const player = (screen==="local" ? (turn===HUMAN?HUMAN:AI) : HUMAN);
     const nb=drop(board,col,player); if(!nb) return;
     setBoard(nb);
     if(screen==="vsai"){ setTurn(AI); const p={...profile}; p.humanColumnFreq[col]=(p.humanColumnFreq[col]||0)+1; saveProfile(p); setProfile(p); }
-    else { setTurn(turn===HUMAN?AI:HUMAN); } // alternate P1/P2
+    else { setTurn(turn===HUMAN?AI:HUMAN); }
   }
 
   function reset(){ setBoard(empty()); setTurn(HUMAN); setOverlay(null); }
@@ -238,13 +237,13 @@ export default function App(){
     return (
       <div ref={rootRef} style={ui.page}>
         <header className="mm4-header" style={ui.header}>
-          <img src="./logo-128.png" alt="MindMatch 4 logo" width="40" height="40" style={{borderRadius:8}}/>
+          <img src={ASSET('logo-128.png')} alt="MindMatch 4 logo" width="40" height="40" style={{borderRadius:8}}/>
         </header>
 
         <main style={ui.menuMain}>
           <div style={ui.titleWrap}>
             <h1 style={ui.h1}>MindMatch 4</h1>
-            <div style={ui.tagline}>Every win makes me stronger.</div>
+            <div style={ui.tagline}>Beat the adaptive AI.</div>
           </div>
 
           <div style={ui.menuButtons}>
@@ -252,6 +251,7 @@ export default function App(){
             <button style={{...ui.btn, background:"#38bdf8"}} onClick={()=>{setScreen("local"); reset();}}>Multiplayer (Local)</button>
           </div>
 
+          {/* Theme (system by default) */}
           <div style={ui.row}>
             <label style={{...ui.muted,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
               Theme
@@ -263,19 +263,44 @@ export default function App(){
             </label>
           </div>
 
+          {/* How to play — GIFs with SVG fallbacks */}
+          <section style={ui.help}>
+            <h2 style={ui.h2}>How to play</h2>
+            <div style={ui.steps}>
+              <div style={ui.step}>
+                <div style={ui.stepMedia}>
+                  <img src={ASSET('howto-drop.gif')} alt="" onError={(e)=>e.currentTarget.replaceWith(FallbackSVG("Tap a column"))} style={ui.gif}/>
+                </div>
+                <div style={ui.stepText}><b>1.</b> Tap/click a column to drop your disc. Discs stack from the <b>bottom</b>.</div>
+              </div>
+              <div style={ui.step}>
+                <div style={ui.stepMedia}>
+                  <img src={ASSET('howto-win.gif')} alt="" onError={(e)=>e.currentTarget.replaceWith(FallbackSVG("Make four in a row"))} style={ui.gif}/>
+                </div>
+                <div style={ui.stepText}><b>2.</b> Connect <b>four in a row</b> (horizontal, vertical, or diagonal) to win.</div>
+              </div>
+              <div style={ui.step}>
+                <div style={ui.stepMedia}>
+                  <img src={ASSET('howto-share.gif')} alt="" onError={(e)=>e.currentTarget.replaceWith(FallbackSVG("Share a challenge"))} style={ui.gif}/>
+                </div>
+                <div style={ui.stepText}><b>3.</b> Share a <b>challenge link</b> and ask friends to beat your best streak.</div>
+              </div>
+            </div>
+          </section>
+
           <div style={ui.menuFoot}>
-            <div style={{...ui.muted,fontSize:12}}>Tip: “Multiplayer (Local)” is hot‑seat on the same device. Online play needs a small server—happy to wire that when you’re ready.</div>
+            <div style={{...ui.muted,fontSize:12}}>“Multiplayer (Local)” is hot‑seat on the same device. Online play needs a tiny backend—we can add Firebase/WebRTC later.</div>
           </div>
         </main>
       </div>
     );
   }
 
-  // Game UI
+  // Game screen
   return (
     <div ref={rootRef} style={ui.page}>
       <header className="mm4-header" style={ui.header}>
-        <img src="./logo-128.png" alt="MindMatch 4 logo" width="36" height="36" style={{borderRadius:8}}/>
+        <img src={ASSET('logo-128.png')} alt="MindMatch 4 logo" width="36" height="36" style={{borderRadius:8}}/>
         <div style={{textAlign:"center",flex:1}}>
           <div style={ui.h1Small}>MindMatch 4</div>
           <div style={ui.taglineSmall}>{screen==="vsai" ? "Beat the adaptive AI." : "Local hot‑seat: P1 vs P2"}</div>
@@ -292,20 +317,20 @@ export default function App(){
 
       <div className="mm4-status" style={ui.status}>
         <div style={{fontWeight:700}}>{status}</div>
-        <div style={{...ui.muted,fontSize:14}}>
+        <div style={{...ui.muted,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
           {screen==="vsai" ? <>Depth <b>{profile.aiConfig.depth}</b> · RNG <b>{Math.round(profile.aiConfig.randomness*100)}%</b> · Style <b>{profile.aiConfig.style}</b> · </> : null}
           Rating <b>{stats.rating}</b> · Best Streak <b>{stats.bestStreak}</b>
         </div>
       </div>
 
       <main className="mm4-main" style={ui.main}>
-        {/* Board (left/top) */}
-        <section ref={boardBoxRef} style={ui.panel}>
+        {/* Board */}
+        <section ref={boardPanelRef} style={ui.panel}>
           <div style={ui.boardWrap}>
             <div style={ui.boardFrame}>
               <div style={ui.boardGrid}>
                 {Array.from({length:COLS}).map((_, c)=>{
-                  const col = [...board.map(r=>r[c])].reverse(); // bottom-first
+                  const col = [...board.map(r=>r[c])].reverse();
                   return (
                     <button key={c} style={ui.colBtn} onClick={()=>human(c)} title={`Drop in column ${c+1}`} disabled={!!winner(board)}>
                       {col.map((cell,i)=>(
@@ -324,15 +349,15 @@ export default function App(){
               <div style={ui.holes} aria-hidden="true"></div>
             </div>
           </div>
-          <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:8}}>
+          <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:8,flexWrap:"wrap"}}>
             <button style={{...ui.btn,background:"#38bdf8"}} onClick={reset}>New Game</button>
             <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
             <button style={{...ui.btn,background:"#ef4444"}} onClick={resetAll}>Reset Profile</button>
           </div>
         </section>
 
-        {/* Stats (right on desktop, below on mobile) */}
-        <aside style={ui.panel}>
+        {/* Stats */}
+        <aside style={{...ui.panel, overflow:"auto"}}>
           <h3 style={{marginTop:0}}>Stats</h3>
           <div style={{fontSize:14,lineHeight:1.6}}>
             <div><span style={ui.muted}>Games:</span> {stats.games}</div>
@@ -381,11 +406,27 @@ export default function App(){
   );
 }
 
+/* ---------- SVG fallback for instructions ---------- */
+function FallbackSVG(text){
+  const el = document.createElementNS("http://www.w3.org/2000/svg","svg");
+  el.setAttribute("viewBox","0 0 320 180");
+  el.setAttribute("width","320"); el.setAttribute("height","180");
+  el.innerHTML = `
+    <defs>
+      <linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#0b162b"/><stop offset="1" stop-color="#0a1222"/></linearGradient>
+    </defs>
+    <rect x="0" y="0" width="320" height="180" rx="16" fill="url(#g)"/>
+    <circle cx="70" cy="90" r="20" fill="#ef4444"/><circle cx="120" cy="90" r="20" fill="#fbbf24"/>
+    <text x="160" y="96" fill="#e5e7eb" font-size="14" font-family="Arial" text-anchor="middle">${text}</text>`;
+  return el;
+}
+
 /* ---------- styles ---------- */
 const ui = {
   page:{minHeight:"100svh", background:"linear-gradient(180deg,var(--bg2),var(--bg))", color:"var(--ink)", overflow:"hidden"},
   header:{display:"flex",alignItems:"center",gap:12, padding:"10px 12px"},
   h1:{margin:"0 0 6px", fontSize:32, fontWeight:900, textAlign:"center"},
+  h2:{margin:"14px 0 8px", fontSize:20},
   tagline:{textAlign:"center", color:"var(--muted)"},
   h1Small:{fontSize:20, fontWeight:800, lineHeight:1},
   taglineSmall:{fontSize:12, color:"var(--muted)"},
@@ -394,13 +435,19 @@ const ui = {
   btn:{border:0,padding:"10px 14px",borderRadius:12,color:"#fff",fontWeight:700,cursor:"pointer"},
   select:{border:"1px solid var(--panel-border)", background:"var(--panel)", color:"var(--ink)", borderRadius:10, padding:"8px 10px", fontWeight:600},
   muted:{color:"var(--muted)"},
-  menuMain:{display:"grid", gridTemplateRows:"auto auto auto 1fr", gap:12, height:"calc(100svh - 64px)", padding:"0 12px"},
+  menuMain:{display:"grid", gridTemplateRows:"auto auto auto 1fr", gap:12, height:"calc(100svh - 64px)", padding:"0 12px", overflow:"hidden"},
   titleWrap:{marginTop:4},
-  menuButtons:{display:"flex", gap:10, justifyContent:"center", marginTop:8},
+  menuButtons:{display:"flex", gap:10, justifyContent:"center", marginTop:8, flexWrap:"wrap"},
+  help:{background:"var(--panel)", border:"1px solid var(--panel-border)", borderRadius:16, padding:12},
+  steps:{display:"grid", gridTemplateColumns:"1fr", gap:12},
+  step:{display:"grid", gridTemplateColumns:"160px 1fr", gap:12, alignItems:"center"},
+  stepMedia:{width:160, height:90, overflow:"hidden", borderRadius:10, border:"1px solid var(--panel-border)"},
+  gif:{width:"100%", height:"100%", objectFit:"cover", display:"block"},
+  stepText:{fontSize:14},
   menuFoot:{display:"grid", placeItems:"center"},
   status:{display:"flex",justifyContent:"space-between",alignItems:"center", padding:"0 12px 6px"},
   main:{maxWidth:1200, margin:"0 auto", padding:"0 12px", display:"grid", gridTemplateColumns:"1fr", gap:12, height:"calc(100svh - 136px)"},
-  panel:{background:"var(--panel)", border:"1px solid var(--panel-border)", borderRadius:16, padding:12, boxShadow:"0 10px 30px rgba(0,0,0,.12)", minHeight:0},
+  panel:{background:"var(--panel)", border:"1px solid var(--panel-border)", borderRadius:16, padding:12, boxShadow:"0 10px 30px rgba(0,0,0,.12)", minHeight:0, overflow:"hidden"},
   /* Board */
   boardWrap:{display:"grid", placeItems:"center", height:"100%"},
   boardFrame:{position:"relative", borderRadius:16, padding:"calc(var(--gap) * .6)", background:"linear-gradient(180deg,#0b162b,#0a1222)", height:"100%", width:"fit-content", maxWidth:"100%"},
@@ -421,7 +468,12 @@ const ui = {
   toast:{position:"fixed", bottom:16, left:"50%", transform:"translateX(-50%)", background:"var(--panel)", color:"var(--ink)", padding:"8px 12px", border:"1px solid var(--panel-border)", borderRadius:10}
 };
 
-// desktop layout: stats on right
+// desktop: stats on right, instructions in 3 columns
 const styleEl=document.createElement("style");
-styleEl.textContent=`@media (min-width: 900px){ .mm4-main{ grid-template-columns: 1fr 320px; } }`;
+styleEl.textContent=`
+@media (min-width: 900px){
+  .mm4-main{ grid-template-columns: minmax(0,1fr) 320px; }
+  .mm4-help-steps{ grid-template-columns: repeat(3,1fr); }
+}
+`;
 document.head.appendChild(styleEl);
