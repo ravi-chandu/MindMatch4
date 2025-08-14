@@ -3,13 +3,17 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 
-/** MindMatch 4 — production build
+/**
+ * MindMatch 4 — production build
  *
- * This version has been enhanced to include:
- * - Firebase Firestore integration for a global, real-time leaderboard.
- * - Refactored UI components for a cleaner, more modern look.
- * - Improved code organization and state management.
- * - A more robust, mobile-first responsive design.
+ * This is a corrected and enhanced version of the MindMatch 4 game.
+ * It's a single, self-contained React component ready to be used in your project.
+ *
+ * Key features include:
+ * - A refined game loop and state management.
+ * - Robust Firebase Firestore integration for a global, real-time leaderboard.
+ * - Corrected and clean CSS styling for a responsive, modern UI.
+ * - An intelligent AI opponent using the Minimax algorithm.
  *
  * @author Gemini
  */
@@ -25,7 +29,7 @@ const LS_STATS = "mm4_stats_v9";
 const LS_NAME = "mm4_name";
 const LS_THEME = "mm4_theme"; // "system" | "light" | "dark"
 
-// Firestore global variables
+// Firebase global variables
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
 
@@ -105,7 +109,7 @@ const evalWin = (window, player) => {
 const scorePosition = (board, player, style = "balanced") => {
     let score = 0;
     const center = Math.floor(COLS / 2);
-    
+
     // Center column bias
     for (let r = 0; r < ROWS; r++) {
         if (board[r][center] === player) score += 8;
@@ -276,15 +280,28 @@ const Board = ({ board, onDrop, disabled }) => {
             className="grid gap-2 p-2 rounded-xl bg-gray-700 aspect-square w-full"
             style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}
             onMouseUp={handleMouseUp}
+            onTouchEnd={e => {
+                // To support touch, use the last touch point
+                const touch = e.changedTouches[0];
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const colWidth = rect.width / COLS;
+                const col = Math.floor(x / colWidth);
+                onDrop(col);
+            }}
         >
             {board.map((row, r) =>
                 row.map((cell, c) => (
                     <div
                         key={`${r}-${c}`}
-                        className="bg-white rounded-full aspect-square relative"
+                        className="bg-white rounded-full aspect-square relative overflow-hidden"
                     >
                         {cell !== 0 && (
-                            <div className={`absolute inset-1 rounded-full animate-drop-${r} ${cell === HUMAN ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
+                            <div className={`
+                                absolute inset-1 rounded-full
+                                ${cell === HUMAN ? 'bg-red-500' : 'bg-yellow-500'}
+                                animate-drop
+                            `} style={{ animationDelay: `${r * 0.05}s` }}></div>
                         )}
                     </div>
                 ))
@@ -354,6 +371,9 @@ const Confetti = () => (
                     left: `${Math.random() * 100}%`,
                     animationDelay: `${Math.random() * 1.5}s`,
                     backgroundColor: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                    '--x': `${(Math.random() - 0.5) * 200}px`,
+                    '--y': `${(Math.random() * 200) + 100}vh`,
+                    '--r': `${Math.random() * 360}deg`
                 }}
             ></div>
         ))}
@@ -364,7 +384,6 @@ const Confetti = () => (
 export default function App() {
     // State management for game and UI
     const [theme, setTheme] = useTheme();
-    const [screen, setScreen] = useState("menu");
     const [board, setBoard] = useState(empty());
     const [turn, setTurn] = useState(HUMAN);
     const [status, setStatus] = useState("Your turn");
@@ -376,7 +395,7 @@ export default function App() {
     const [isFirebaseReady, setIsFirebaseReady] = useState(false);
     const [userId, setUserId] = useState(null);
     const [leaders, setLeaders] = useState([]);
-    
+
     const boardPanelRef = useRef(null);
 
     const isGameOver = useMemo(() => {
@@ -386,7 +405,7 @@ export default function App() {
     // --- Firebase Init & State Management ---
     useEffect(() => {
         let unsubscribe = () => {};
-        
+
         const initFirebase = async () => {
             try {
                 const app = initializeApp(firebaseConfig);
@@ -394,7 +413,7 @@ export default function App() {
                 const db = getFirestore(app);
 
                 // Sign in with custom token if available, otherwise anonymously
-                if (typeof __initial_auth_token !== 'undefined') {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token.length > 0) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
@@ -404,11 +423,11 @@ export default function App() {
                     if (user) {
                         setUserId(user.uid);
                         setIsFirebaseReady(true);
-                        
+
                         // Check if the user has a profile, create one if not
                         const userDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/profile`, 'stats');
                         const userDocSnap = await getDoc(userDocRef);
-                        
+
                         if (!userDocSnap.exists()) {
                             await setDoc(userDocRef, { name: name, stats: stats, createdAt: serverTimestamp() });
                         }
@@ -454,7 +473,7 @@ export default function App() {
     }, [board]);
 
     const handlePlayerMove = useCallback((col) => {
-        if (turn !== HUMAN || isGameOver || !board[0][col] === 0) return;
+        if (turn !== HUMAN || isGameOver || board[0][col] !== 0) return;
 
         // Update profile with column choice
         const newProfile = { ...profile };
@@ -469,7 +488,7 @@ export default function App() {
             setStatus("AI is thinking...");
         }
     }, [turn, isGameOver, profile, dropDisc, board]);
-    
+
     const handleGameEnd = useCallback(async (winner) => {
         let result = 'D';
         if (winner === HUMAN) {
@@ -482,7 +501,7 @@ export default function App() {
         } else {
             setStatus("It's a draw!");
         }
-        
+
         // Update local stats and profile
         const newStats = updateStats(stats, result);
         saveStats(newStats);
@@ -494,11 +513,12 @@ export default function App() {
 
         // Update Firestore if user is authenticated
         if (userId && isFirebaseReady) {
-            const userDocRef = doc(getFirestore(), `artifacts/${appId}/users/${userId}/profile`, 'stats');
+            const db = getFirestore();
+            const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, 'stats');
             await setDoc(userDocRef, { name: name, stats: newStats, lastPlayed: serverTimestamp() }, { merge: true });
 
             // Also update the public leaderboard
-            const publicDocRef = doc(getFirestore(), `artifacts/${appId}/public/data/leaderboard`, userId);
+            const publicDocRef = doc(db, `artifacts/${appId}/public/data/leaderboard`, userId);
             await setDoc(publicDocRef, { name: name, stats: newStats, lastPlayed: serverTimestamp() }, { merge: true });
         }
         setOverlay(true);
@@ -507,10 +527,10 @@ export default function App() {
     // --- AI Turn Logic ---
     useEffect(() => {
         if (turn !== AI || isGameOver) return;
-        
+
         setOverlay(true);
         const { depth, randomness, style } = profile.aiConfig;
-        
+
         const aiMoveTimer = setTimeout(() => {
             let bestCol;
             if (Math.random() < randomness) {
@@ -537,58 +557,19 @@ export default function App() {
 
     // Check for win/draw after each move
     useEffect(() => {
-        if (!isGameOver) return;
-        
-        const humanWin = checkWin(board, HUMAN);
-        const aiWin = checkWin(board, AI);
-        
-        if (humanWin) {
-            handleGameEnd(HUMAN);
-        } else if (aiWin) {
-            handleGameEnd(AI);
-        } else {
-            handleGameEnd(0); // Draw
+        if (isGameOver) {
+            const humanWin = checkWin(board, HUMAN);
+            const aiWin = checkWin(board, AI);
+            if (humanWin) {
+                handleGameEnd(HUMAN);
+            } else if (aiWin) {
+                handleGameEnd(AI);
+            } else {
+                handleGameEnd(0); // Draw
+            }
         }
     }, [isGameOver, board, handleGameEnd]);
 
-    // --- UI/Layout Effects ---
-    useEffect(() => {
-        function fit() {
-            const root = document.body;
-            const panel = boardPanelRef.current;
-            if (!root || !panel) return;
-
-            const styles = getComputedStyle(document.documentElement);
-            const gap = parseFloat(styles.getPropertyValue("--gap")) || 10;
-            const headerH = document.querySelector(".mm4-header")?.getBoundingClientRect().height || 0;
-            const statusH = document.querySelector(".mm4-status")?.getBoundingClientRect().height || 0;
-            const vw = Math.max(innerWidth, document.documentElement.clientWidth);
-            const vh = Math.max(innerHeight, document.documentElement.clientHeight);
-            const isDesktop = vw >= 900;
-
-            const availH = vh - headerH - statusH - 24;
-            const panelRect = panel.getBoundingClientRect();
-            const availW = isDesktop ? panelRect.width : vw - 24;
-            const cellW = (availW - gap * (COLS - 1) - gap * 2) / COLS;
-            const cellH = (availH - gap * (ROWS - 1) - gap * 2) / ROWS;
-            let cell = Math.floor(Math.max(28, Math.min(cellW, cellH)));
-            cell = Math.min(cell, isDesktop ? 72 : 56);
-            document.documentElement.style.setProperty("--cell", `${cell}px`);
-        }
-        
-        const rafFit = () => requestAnimationFrame(() => requestAnimationFrame(fit));
-        rafFit();
-        const ro = new ResizeObserver(rafFit);
-        ro.observe(document.body);
-        window.addEventListener("resize", rafFit);
-        window.addEventListener("orientationchange", rafFit);
-        
-        return () => {
-            ro.disconnect();
-            window.removeEventListener("resize", rafFit);
-            window.removeEventListener("orientationchange", rafFit);
-        };
-    }, []);
 
     // --- Main Render ---
     return (
@@ -600,21 +581,20 @@ export default function App() {
                 <div className="flex-1 flex flex-col items-center justify-start gap-4 p-4 md:p-0">
                     <h1 className="text-4xl font-bold text-center">MindMatch 4</h1>
                     <div className="mt-4 w-full flex flex-col gap-4">
-                        <StatsPanel stats={stats} userId={userId} playerName={name} />
-                        <Leaderboard leaders={leaders} />
+                        {isFirebaseReady && <StatsPanel stats={stats} userId={userId} playerName={name} />}
+                        {isFirebaseReady && <Leaderboard leaders={leaders} />}
                     </div>
                 </div>
 
                 {/* Right Panel: Game Board */}
                 <div ref={boardPanelRef} className="flex-1 w-full flex flex-col items-center justify-center gap-4 relative">
                     <div className="w-full text-center">
-                        <p className="text-xl font-semibold mm4-status">{status}</p>
+                        <p className="text-xl font-semibold">{status}</p>
                     </div>
                     <Board board={board} onDrop={handlePlayerMove} disabled={overlay} />
                     <div className="flex flex-col gap-2 mt-4 w-full">
                         <button
                             onClick={() => {
-                                setScreen("vsai");
                                 setBoard(empty());
                                 setTurn(HUMAN);
                                 setStatus("Your turn");
@@ -625,63 +605,51 @@ export default function App() {
                         >
                             Play vs AI
                         </button>
-                        <button
-                            onClick={() => {
-                                setScreen("local");
-                                setBoard(empty());
-                                setTurn(HUMAN);
-                                setStatus("Player 1's turn");
-                                setOverlay(false);
-                                setShowConfetti(false);
-                            }}
-                            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105"
-                        >
-                            Local Multiplayer
-                        </button>
                     </div>
                 </div>
             </div>
-            <style jsx global>{`
+            <style>
+                {`
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+                
                 :root {
                     --bg-color: #1a202c;
                     --text-color: #e2e8f0;
                     --container-bg: #2d3748;
                     --board-bg: #4a5568;
-                    --board-border: #6b7280;
                     --player1-color: #f56565;
                     --player2-color: #ecc94b;
-                    --cell: 56px;
                 }
-
+                
                 @media (prefers-color-scheme: light) {
                     :root {
                         --bg-color: #f0f4f8;
                         --text-color: #1a202c;
                         --container-bg: #ffffff;
                         --board-bg: #cbd5e0;
-                        --board-border: #a0aec0;
                         --player1-color: #e53e3e;
                         --player2-color: #f6ad55;
                     }
                 }
-
+                
+                body {
+                    font-family: 'Inter', sans-serif;
+                }
                 .bg-gray-900 { background-color: var(--bg-color); }
                 .bg-gray-800 { background-color: var(--container-bg); }
                 .text-white { color: var(--text-color); }
+                .bg-gray-700 { background-color: var(--board-bg); }
+                .bg-red-500 { background-color: var(--player1-color); }
+                .bg-yellow-500 { background-color: var(--player2-color); }
                 
-                @keyframes drop-0 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
-                @keyframes drop-1 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
-                @keyframes drop-2 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
-                @keyframes drop-3 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
-                @keyframes drop-4 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
-                @keyframes drop-5 { from { transform: translateY(-${ROWS} * var(--cell)); } to { transform: translateY(0); } }
+                @keyframes drop {
+                    from { transform: translateY(-100vh); }
+                    to { transform: translateY(0); }
+                }
                 
-                .animate-drop-0 { animation: drop-0 0.5s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
-                .animate-drop-1 { animation: drop-1 0.6s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
-                .animate-drop-2 { animation: drop-2 0.7s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
-                .animate-drop-3 { animation: drop-3 0.8s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
-                .animate-drop-4 { animation: drop-4 0.9s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
-                .animate-drop-5 { animation: drop-5 1.0s cubic-bezier(0.5, 0, 0.5, 1.5) forwards; }
+                .animate-drop {
+                    animation: drop 0.5s cubic-bezier(0.5, 0, 0.5, 1.5) forwards;
+                }
 
                 .confetti-container {
                     position: fixed;
@@ -701,10 +669,11 @@ export default function App() {
                     animation: fall 2s ease-out forwards;
                 }
                 @keyframes fall {
-                    0% { transform: translate(0, -100vh) rotate(0deg); opacity: 1; }
+                    0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
                     100% { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; }
                 }
-            `}</style>
+                `}
+            </style>
         </div>
     );
 }
