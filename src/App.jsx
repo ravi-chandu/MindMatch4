@@ -1,46 +1,36 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-/** MindMatch 4 — V2
- * - Stronger mobile layout (no overlap, near-zero jank)
- * - Safer sizing: debounced + 2x rAF + ResizeObserver
- * - Precomputed windows for faster evaluation
- * - System theme by default (no attribute until user selects)
- * - Home with real win-type GIFs
- * - Gentle haptics on drop/win (mobile)
+/** MindMatch 4 — V2.2
+ * - Smaller mobile board/discs, no scroll
+ * - Desktop vs mobile layout
+ * - Column Preferences compress to fit
+ * - Last move highlight (~2.3s) before celebration
  */
 
 const ROWS=6, COLS=7, HUMAN=1, AI=2;
-const LS_PROFILE="mm4_profile_v9";
-const LS_STATS="mm4_stats_v9";
+const LS_PROFILE="mm4_profile_v10";
+const LS_STATS="mm4_stats_v10";
 const LS_NAME="mm4_name";
-const LS_THEME="mm4_theme"; // "system" | "light" | "dark"
+const LS_THEME="mm4_theme";
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const emptyBoard=()=>Array.from({length:ROWS},()=>Array(COLS).fill(0));
+const empty=()=>Array.from({length:ROWS},()=>Array(COLS).fill(0));
 const clone=b=>b.map(r=>r.slice());
 
-// --- Precompute all 4-in-a-row windows (faster eval/winner)
+/* ---------- precomputed windows ---------- */
 const WINDOWS=[];
-(function makeWindows(){
-  // horizontal
-  for(let r=0;r<ROWS;r++) for(let c=0;c<=COLS-4;c++)
-    WINDOWS.push([[r,c],[r,c+1],[r,c+2],[r,c+3]]);
-  // vertical
-  for(let c=0;c<COLS;c++) for(let r=0;r<=ROWS-4;r++)
-    WINDOWS.push([[r,c],[r+1,c],[r+2,c],[r+3,c]]);
-  // diag down-right
-  for(let r=0;r<=ROWS-4;r++) for(let c=0;c<=COLS-4;c++)
-    WINDOWS.push([[r,c],[r+1,c+1],[r+2,c+2],[r+3,c+3]]);
-  // diag up-right
-  for(let r=3;r<ROWS;r++) for(let c=0;c<=COLS-4;c++)
-    WINDOWS.push([[r,c],[r-1,c+1],[r-2,c+2],[r-3,c+3]]);
+(function(){
+  for(let r=0;r<ROWS;r++) for(let c=0;c<=COLS-4;c++) WINDOWS.push([[r,c],[r,c+1],[r,c+2],[r,c+3]]);
+  for(let c=0;c<COLS;c++) for(let r=0;r<=ROWS-4;r++) WINDOWS.push([[r,c],[r+1,c],[r+2,c],[r+3,c]]);
+  for(let r=0;r<=ROWS-4;r++) for(let c=0;c<=COLS-4;c++) WINDOWS.push([[r,c],[r+1,c+1],[r+2,c+2],[r+3,c+3]]);
+  for(let r=3;r<ROWS;r++) for(let c=0;c<=COLS-4;c++) WINDOWS.push([[r,c],[r-1,c+1],[r-2,c+2],[r-3,c+3]]);
 })();
 
-// --- theme
+/* ---------- theme ---------- */
 function applyTheme(mode){ if(mode==="system"||!mode){document.documentElement.removeAttribute("data-theme");return;} document.documentElement.setAttribute("data-theme",mode); }
 function useTheme(){ const t=localStorage.getItem(LS_THEME); const init=(t==="light"||t==="dark"||t==="system")?t:"system"; const [mode,setMode]=useState(init); useEffect(()=>{applyTheme(mode);localStorage.setItem(LS_THEME,mode||"system");},[mode]); return [mode,setMode]; }
 
-// --- storage
+/* ---------- storage ---------- */
 function defProfile(){return{humanColumnFreq:Array(COLS).fill(0),lastTen:[],aiConfig:{depth:4,randomness:0.2,style:"balanced"}}}
 function loadProfile(){try{const s=localStorage.getItem(LS_PROFILE); if(!s) return defProfile(); const p=JSON.parse(s); return {...defProfile(),...p, aiConfig:{...defProfile().aiConfig, ...(p.aiConfig||{})}}}catch{return defProfile()}}
 function saveProfile(p){localStorage.setItem(LS_PROFILE,JSON.stringify(p))}
@@ -48,34 +38,30 @@ function defStats(){return{games:0,wins:0,losses:0,draws:0,bestStreak:0,curStrea
 function loadStats(){try{return JSON.parse(localStorage.getItem(LS_STATS))||defStats()}catch{return defStats()}}
 function saveStats(s){localStorage.setItem(LS_STATS,JSON.stringify(s))}
 
-// --- board core
+/* ---------- board core ---------- */
 function drop(b,col,pl){ if(b[0][col]!==0) return null; const nb=clone(b); for(let r=ROWS-1;r>=0;r--) if(nb[r][col]===0){nb[r][col]=pl; return nb} return null }
-function availableMoves(b){ const m=[]; for(let c=0;c<COLS;c++) if(b[0][c]===0) m.push(c); return m; }
+function moves(b){ const m=[]; for(let c=0;c<COLS;c++) if(b[0][c]===0) m.push(c); return m; }
 function winner(b){
   for(const w of WINDOWS){
     const a=b[w[0][0]][w[0][1]], b1=b[w[1][0]][w[1][1]], c=b[w[2][0]][w[2][1]], d=b[w[3][0]][w[3][1]];
     if(a!==0 && a===b1 && a===c && a===d) return a;
   }
-  return availableMoves(b).length?0:3;
+  return moves(b).length?0:3;
 }
 
-// --- AI eval (windows-based = faster)
+/* ---------- eval / minimax ---------- */
 function evalWindow(vals, me){
   const you = me===AI?HUMAN:AI;
-  const countMe=vals.filter(v=>v===me).length;
-  const countYou=vals.filter(v=>v===you).length;
-  const empty=vals.filter(v=>v===0).length;
-  if(countMe===4) return 100000;
-  if(countMe===3 && empty===1) return 220;
-  if(countMe===2 && empty===2) return 50;
-  if(countYou===3 && empty===1) return -200;
-  if(countYou===2 && empty===2) return -40;
+  const m=vals.filter(v=>v===me).length, y=vals.filter(v=>v===you).length, e=vals.filter(v=>v===0).length;
+  if(m===4) return 100000;
+  if(m===3 && e===1) return 220;
+  if(m===2 && e===2) return 50;
+  if(y===3 && e===1) return -200;
+  if(y===2 && e===2) return -40;
   return 0;
 }
 function scorePosition(b, me, style="balanced"){
-  let s=0;
-  // center bias
-  const center=Math.floor(COLS/2);
+  let s=0, center=Math.floor(COLS/2);
   for(let r=0;r<ROWS;r++) if(b[r][center]===me) s+=9;
   for(const w of WINDOWS){
     const vals=[b[w[0][0]][w[0][1]],b[w[1][0]][w[1][1]],b[w[2][0]][w[2][1]],b[w[3][0]][w[3][1]]];
@@ -83,15 +69,6 @@ function scorePosition(b, me, style="balanced"){
   }
   if(style==="aggressive") s*=1.06; else if(style==="defensive") s*=0.98;
   return s;
-}
-
-// --- minimax + alpha-beta + small transposition cache
-const TT_MAX=4000; const TT=new Map();
-function ttKey(b, turn, depth){
-  // compact key: top heights per col + turn + depth
-  const heights=Array(COLS).fill(0);
-  for(let c=0;c<COLS;c++){ let h=0; for(let r=0;r<ROWS;r++) if(b[r][c]!==0){h=ROWS-r; break;} heights[c]=h; }
-  return `${heights.join("")}|${turn}|${depth}`;
 }
 function minimax(b, depth, maximizing, style, bias, alpha=-Infinity, beta=Infinity){
   const w=winner(b);
@@ -101,13 +78,7 @@ function minimax(b, depth, maximizing, style, bias, alpha=-Infinity, beta=Infini
     if(w===3) return {score:0};
     return {score:scorePosition(b, AI, style)};
   }
-
-  const key=ttKey(b, maximizing?AI:HUMAN, depth);
-  if(TT.has(key)) return TT.get(key);
-
-  const ms=availableMoves(b).sort((a,c)=>Math.abs(a-3)-Math.abs(c-3));
-  const pen=(c)=>(bias[c]||0)*1.25;
-
+  const ms=moves(b).sort((a,c)=>Math.abs(a-3)-Math.abs(c-3)), pen=c=>(bias[c]||0)*1.25;
   if(maximizing){
     let best={score:-Infinity,col:ms[0]};
     for(const c of ms){
@@ -117,8 +88,7 @@ function minimax(b, depth, maximizing, style, bias, alpha=-Infinity, beta=Infini
       if(score>best.score) best={score,col:c};
       alpha=Math.max(alpha,score); if(beta<=alpha) break;
     }
-    if(TT.size>TT_MAX){ TT.clear(); }
-    TT.set(key,best); return best;
+    return best;
   }else{
     let best={score:Infinity,col:ms[0]};
     for(const c of ms){
@@ -128,12 +98,11 @@ function minimax(b, depth, maximizing, style, bias, alpha=-Infinity, beta=Infini
       if(score<best.score) best={score,col:c};
       beta=Math.min(beta,score); if(beta<=alpha) break;
     }
-    if(TT.size>TT_MAX){ TT.clear(); }
-    TT.set(key,best); return best;
+    return best;
   }
 }
 
-// --- adapt & stats
+/* ---------- adapt & stats ---------- */
 function adapt(profile, stats){
   const wr=(stats.wins||0)/Math.max(1,stats.games||0);
   const streaky=(stats.curStreak||0)>=3;
@@ -152,9 +121,9 @@ function updStats(s,res){
   n.rating=clamp(Math.round(n.rating),600,3000); return n;
 }
 
-// --- confetti + haptics
+/* ---------- confetti & haptics ---------- */
 function confetti(ms=950){
-  const existing=document.getElementById("mm4-confetti"); if(existing) existing.remove();
+  const old=document.getElementById("mm4-confetti"); if(old) old.remove();
   const c=document.createElement("canvas"); c.id="mm4-confetti"; document.body.appendChild(c);
   const ctx=c.getContext("2d"); const resize=()=>{c.width=innerWidth; c.height=innerHeight}; resize();
   const cols=["#ef4444","#f59e0b","#10b981","#38bdf8","#a78bfa"];
@@ -163,18 +132,27 @@ function confetti(ms=950){
   const tick=t=>{ctx.clearRect(0,0,c.width,c.height); for(const p of ps){p.vy+=p.g;p.x+=p.vx;p.y+=p.vy;p.a+=p.s;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.fillStyle=p.color;ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);ctx.restore();} if(t<end) requestAnimationFrame(tick); else c.remove();};
   requestAnimationFrame(tick);
 }
-const haptic=(ms=12)=>{try{if(navigator.vibrate) navigator.vibrate(ms);}catch{}};
+const haptic=(ms=12)=>{try{navigator.vibrate&&navigator.vibrate(ms);}catch{}};
 
-// --- helpers
+/* ---------- helpers ---------- */
 const parseQuery=()=>{const sp=new URLSearchParams(location.search); const q=Object.fromEntries(sp.entries()); ["target","depth","rand"].forEach(k=>q[k]=q[k]!==undefined?Number(q[k]):undefined); return q}
+function findRowOf(col, b){ // row index of piece just placed in a column
+  for(let r=0;r<ROWS;r++){
+    if(b[r][col]!==0){
+      let rr=r; while(rr+1<ROWS && b[rr+1][col]!==0) rr++;
+      return rr;
+    }
+  }
+  return null;
+}
 
-// --- App
+/* ---------- App ---------- */
 export default function App(){
   const query=useMemo(()=>parseQuery(),[]);
   const [theme,setTheme]=useTheme();
 
   const [screen,setScreen]=useState("menu"); // "menu" | "vsai" | "local"
-  const [board,setBoard]=useState(()=>emptyBoard());
+  const [board,setBoard]=useState(()=>empty());
   const [turn,setTurn]=useState(HUMAN);
   const [status,setStatus]=useState("");
   const [profile,setProfile]=useState(()=>loadProfile());
@@ -183,14 +161,16 @@ export default function App(){
   const [name,setName]=useState(()=>localStorage.getItem(LS_NAME)||"Player");
   const [toast,setToast]=useState(null);
 
+  const [lastMove,setLastMove]=useState(null);        // {r,c,t}
+  const lastTimerRef=useRef(null);
+
   const w=useMemo(()=>winner(board),[board]);
   const over=w!==0;
 
-  // refs for sizing
   const rootRef=useRef(null);
   const boardPanelRef=useRef(null);
 
-  // safer auto-fit (JS only adjusts CSS vars)
+  /* ---------- auto-fit ---------- */
   useEffect(()=>{
     let raf1=0, raf2=0, tmo=0;
     const fit=()=>{
@@ -208,22 +188,23 @@ export default function App(){
       const vh=Math.max(innerHeight,document.documentElement.clientHeight);
       const isDesktop=vw>=900;
 
-      const availH=vh-headerH-statusH-24;
+      const safety=isDesktop?24:84; // reserve for actions + stats
+      const availH=vh-headerH-statusH-safety;
+
       const panelRect=panel.getBoundingClientRect();
       const availW=isDesktop?panelRect.width:vw-24;
 
       const cellW=(availW-gap*(COLS-1)-gap*2)/COLS;
       const cellH=(availH-gap*(ROWS-1)-gap*2)/ROWS;
-      let cell=Math.floor(Math.max(28,Math.min(cellW,cellH)));
-      cell=Math.min(cell,isDesktop?72:58); // slightly larger on mobile for V2
+      let cell=Math.floor(Math.max(24,Math.min(cellW,cellH)));
+      cell=Math.min(cell,isDesktop?72:52);  // smaller on phones
 
       document.documentElement.style.setProperty("--cell",`${cell}px`);
       document.documentElement.style.setProperty("--disc-pad",`${Math.round(cell*0.18)}px`);
-      document.documentElement.style.setProperty("--gap",`${Math.max(6,Math.round(cell*0.18))}px`);
+      document.documentElement.style.setProperty("--gap",`${Math.max(6,Math.round(cell*0.16))}px`);
     };
     const schedule=()=>{ cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); clearTimeout(tmo);
       raf1=requestAnimationFrame(()=>{ raf2=requestAnimationFrame(fit); });
-      // safety debounce for font reflow
       tmo=setTimeout(fit,60);
     };
     schedule();
@@ -233,10 +214,10 @@ export default function App(){
     return ()=>{ ro.disconnect(); removeEventListener("resize",schedule); removeEventListener("orientationchange",schedule); cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); clearTimeout(tmo); };
   },[]);
 
-  // initial adapt
+  /* ---------- initial adapt ---------- */
   useEffect(()=>{ const p=adapt({...profile},{...stats}); saveProfile(p); setProfile(p); /* eslint-disable-next-line */},[]);
 
-  // status text
+  /* ---------- status ---------- */
   useEffect(()=>{
     if(screen==="menu"){ setStatus(""); return; }
     if (w===HUMAN) setStatus(screen==="vsai"?"You win! 🎉":"Player 1 wins! 🎉");
@@ -245,12 +226,11 @@ export default function App(){
     else setStatus(turn===HUMAN? (screen==="vsai"?"Your turn":"P1 turn") : (screen==="vsai"?"AI thinking…":"P2 turn"));
   },[turn,w,screen]);
 
-  // AI move (after brief delay)
+  /* ---------- AI move ---------- */
   useEffect(()=>{
     if(screen!=="vsai"||turn!==AI||over) return;
     const t=setTimeout(()=>{
-      const ms=availableMoves(board); if(!ms.length) return;
-      // immediate win / block
+      const ms=moves(board); if(!ms.length) return;
       for(const c of ms){ if(winner(drop(board,c,AI))===AI){ playAI(c); return; } }
       for(const c of ms){ if(winner(drop(board,c,HUMAN))===HUMAN){ playAI(c); return; } }
       const depth=clamp(query.depth??profile.aiConfig.depth,3,8);
@@ -261,48 +241,58 @@ export default function App(){
         const {score}=minimax(child, Math.max(0,depth-1), false, style, profile.humanColumnFreq);
         return {col,score:score-(profile.humanColumnFreq[col]||0)*1.8};
       }).sort((a,b)=>b.score-a.score);
-      const pick = (Math.random()<randomness && scored.length>1)
+      const pick=(Math.random()<randomness && scored.length>1)
         ? scored[Math.min(2,Math.floor(Math.random()*Math.min(3,scored.length)))].col
         : scored[0].col;
       playAI(pick);
     },140);
     return ()=>clearTimeout(t);
-    // eslint-disable-next-line
   },[turn,over,board,profile,query,screen]);
 
-  function playAI(col){
-    const nb=drop(board,col,AI); if(!nb) return;
-    setBoard(nb); setTurn(HUMAN);
-  }
-
-  // end of game handlers
+  /* ---------- end of game; delay for last-move highlight ---------- */
   useEffect(()=>{
     if(screen==="menu"||!over) return;
     const res=(screen==="vsai")?(w===HUMAN?'W':w===AI?'L':'D'):(w===HUMAN?'W':'L');
     const p={...profile,lastTen:[...profile.lastTen,(res==='W'?'W':'L')].slice(-10)};
     const ns=updStats(stats,res);
     adapt(p,ns); saveProfile(p); saveStats(ns); setProfile(p); setStats(ns);
-    if(res==='W') { confetti(1000); haptic(30); }
-    setOverlay(w===3?'draw':(res==='W'?'win':'lose'));
-    // eslint-disable-next-line
+    const show=()=>{ if(res==='W'){ confetti(1000); haptic(30); } setOverlay(w===3?'draw':(res==='W'?'win':'lose')); };
+    const t=setTimeout(show,2000); // wait ~2s so last-move ring is visible
+    return ()=>clearTimeout(t);
+  // eslint-disable-next-line
   },[over,screen]);
 
-  // interactions
+  /* ---------- interactions ---------- */
   function human(col){
     if(over) return;
     if(screen==="vsai" && turn!==HUMAN) return;
     const player=(screen==="local" ? (turn===HUMAN?HUMAN:AI) : HUMAN);
     const nb=drop(board,col,player); if(!nb) return;
+
+    const r=findRowOf(col, nb);
+    if(lastTimerRef.current) clearTimeout(lastTimerRef.current);
+    setLastMove({r,c:col,t:Date.now()});
+    lastTimerRef.current=setTimeout(()=>setLastMove(null),2300);
+
     setBoard(nb); haptic(8);
     if(screen==="vsai"){ setTurn(AI); const p={...profile}; p.humanColumnFreq[col]=(p.humanColumnFreq[col]||0)+1; saveProfile(p); setProfile(p); }
     else { setTurn(turn===HUMAN?AI:HUMAN); }
   }
-  function newGame(){ setBoard(emptyBoard()); setTurn(HUMAN); setOverlay(null); }
-  function resetAll(){ saveProfile(defProfile()); saveStats(defStats()); setProfile(defProfile()); setStats(defStats()); newGame(); }
+  function playAI(col){
+    const nb=drop(board,col,AI); if(!nb) return;
+    const r=findRowOf(col, nb);
+    if(lastTimerRef.current) clearTimeout(lastTimerRef.current);
+    setLastMove({r,c:col,t:Date.now()});
+    lastTimerRef.current=setTimeout(()=>setLastMove(null),2300);
+
+    setBoard(nb); setTurn(HUMAN);
+  }
+  function reset(){ setBoard(empty()); setTurn(HUMAN); setOverlay(null); }
+  function resetAll(){ saveProfile(defProfile()); saveStats(defStats()); setProfile(defProfile()); setStats(defStats()); reset(); }
   function shareUrl(){ const u=new URL(location.href); u.searchParams.set("mm4","1"); u.searchParams.set("mode","streak"); u.searchParams.set("target",String(stats.bestStreak||1)); u.searchParams.set("depth",String(profile.aiConfig.depth)); u.searchParams.set("rand",String(profile.aiConfig.randomness)); u.searchParams.set("style",String(profile.aiConfig.style)); return u.toString(); }
   async function share(){ const link=shareUrl(); if(navigator.share){ try{ await navigator.share({title:"MindMatch 4 — Challenge",text:`Beat my ${stats.bestStreak}-win streak!`,url:link}); return;}catch{} } await navigator.clipboard?.writeText(link); setToast("Challenge link copied!"); setTimeout(()=>setToast(null),1400); }
 
-  // --- Screens
+  /* ---------- screens ---------- */
   if(screen==="menu"){
     return (
       <div ref={rootRef} style={ui.page}>
@@ -321,8 +311,8 @@ export default function App(){
 
         <main style={ui.menuMain}>
           <div style={ui.menuButtons}>
-            <button style={{...ui.btn,background:"#22c55e"}} onClick={()=>{setScreen("vsai"); newGame();}}>Play vs AI</button>
-            <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setScreen("local"); newGame();}}>Multiplayer (Local)</button>
+            <button style={{...ui.btn,background:"#22c55e"}} onClick={()=>{setScreen("vsai"); reset();}}>Play vs AI</button>
+            <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setScreen("local"); reset();}}>Multiplayer (Local)</button>
           </div>
 
           <section style={ui.help}>
@@ -343,7 +333,7 @@ export default function App(){
     );
   }
 
-  // --- Game screen
+  /* ---------- game screen ---------- */
   return (
     <div ref={rootRef} style={ui.page}>
       <header className="mm4-header" style={ui.header}>
@@ -378,18 +368,24 @@ export default function App(){
             <div style={ui.boardFrame} role="grid" aria-label="Connect Four board">
               <div style={ui.boardGrid}>
                 {Array.from({length:COLS}).map((_,c)=>{
-                  const col=[...board.map(r=>r[c])].reverse(); // bottom-up
+                  const col=[...board.map(r=>r[c])].reverse(); // bottom-up for display
                   return (
                     <button key={c} style={ui.colBtn} onClick={()=>human(c)} title={`Drop in column ${c+1}`} aria-label={`Drop in column ${c+1}`} disabled={!!winner(board)}>
-                      {col.map((cell,i)=>(
-                        <div key={i} style={ui.cell}>
-                          <div style={{
-                            ...ui.disc,
-                            background: cell===HUMAN? "var(--red)" : cell===AI? "var(--yellow)" : "transparent",
-                            boxShadow: cell? "inset 0 6px 12px rgba(0,0,0,.35)":"none"
-                          }}/>
-                        </div>
-                      ))}
+                      {col.map((cell,i)=>{
+                        const realRow = ROWS - 1 - i;
+                        const isLast = lastMove && lastMove.r === realRow && lastMove.c === c && (Date.now() - lastMove.t) < 2300;
+                        return (
+                          <div key={i} style={ui.cell}>
+                            <div style={{
+                              ...ui.disc,
+                              background: cell===HUMAN? "var(--red)" : cell===AI? "var(--yellow)" : "transparent",
+                              boxShadow: cell ? "inset 0 6px 12px rgba(0,0,0,.35)" : "none",
+                              outline: isLast ? "3px solid rgba(56,189,248,.9)" : "none",
+                              outlineOffset: isLast ? "2px" : "0"
+                            }}/>
+                          </div>
+                        );
+                      })}
                     </button>
                   );
                 })}
@@ -398,7 +394,7 @@ export default function App(){
             </div>
           </div>
           <div style={ui.actions}>
-            <button style={{...ui.btn,background:"#38bdf8"}} onClick={newGame}>New Game</button>
+            <button style={{...ui.btn,background:"#38bdf8"}} onClick={reset}>New Game</button>
             <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
             <button style={{...ui.btn,background:"#ef4444"}} onClick={resetAll}>Reset Profile</button>
           </div>
@@ -440,8 +436,8 @@ export default function App(){
               {overlay==='win' ? "Nice! Try to push your streak." : overlay==='lose' ? "Go again—you’ll get it." : "Evenly matched!"}
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-              <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setOverlay(null); newGame();}}>Play Again</button>
-              <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
+              <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setOverlay(null); reset();}}>Play Again</button>
+              <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share</button>
             </div>
           </div>
         </div>
@@ -452,7 +448,7 @@ export default function App(){
   );
 }
 
-/* --- HowTo card --- */
+/* ---------- HowTo card ---------- */
 function HowTo({img,text}){
   const [ok,setOk]=useState(true);
   return (
@@ -466,7 +462,7 @@ function HowTo({img,text}){
   );
 }
 
-/* --- Styles (inline for simplicity) --- */
+/* ---------- Styles ---------- */
 const ui={
   page:{minHeight:"100svh",background:"linear-gradient(180deg,var(--bg2),var(--bg))",color:"var(--ink)",overflow:"hidden"},
   header:{display:"flex",alignItems:"center",gap:12,padding:"10px 12px"},
@@ -501,7 +497,7 @@ const ui={
   actions:{display:"flex",gap:8,justifyContent:"center",marginTop:8,flexWrap:"wrap"},
   bars:{display:"flex",gap:6,alignItems:"end"},
   bar:{flex:1},
-  barOuter:{height:70,background:"rgba(148,163,184,.35)",borderRadius:"6px 6px 0 0",overflow:"hidden",display:"flex",alignItems:"end"},
+  barOuter:{height:"clamp(48px, 7.2vh, 70px)",background:"rgba(148,163,184,.35)",borderRadius:"6px 6px 0 0",overflow:"hidden",display:"flex",alignItems:"end"},
   barInner:{width:"100%",background:"var(--green)"},
   input:{padding:"8px 10px",borderRadius:10,border:"1px solid var(--panel-border)",background:"var(--panel)",color:"var(--ink)",width:"100%"},
   overlay:{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"grid",placeItems:"center",padding:16},
@@ -509,7 +505,11 @@ const ui={
   toast:{position:"fixed",bottom:16,left:"50%",transform:"translateX(-50%)",background:"var(--panel)",color:"var(--ink)",padding:"8px 12px",border:"1px solid var(--panel-border)",borderRadius:10}
 };
 
-// desktop layout rule once
+// responsive CSS rules appended once
 const styleEl=document.createElement("style");
-styleEl.textContent=`@media (min-width:900px){ .mm4-main{grid-template-columns:minmax(0,1fr) 320px;} .mm4-help-steps{grid-template-columns:repeat(3,1fr);} }`;
+styleEl.textContent=`@media (min-width:900px){ .mm4-main{grid-template-columns:minmax(0,1fr) 320px;} .mm4-help-steps{grid-template-columns:repeat(3,1fr);} } @media (max-width:899px){ .mm4-main{ height: calc(100svh - 132px); } button{ padding: 9px 12px; } }`;
 document.head.appendChild(styleEl);
+
+/* ---------- defaults ---------- */
+function defProfile(){return{humanColumnFreq:Array(COLS).fill(0),lastTen:[],aiConfig:{depth:4,randomness:0.2,style:"balanced"}}}
+function defStats(){return{games:0,wins:0,losses:0,draws:0,bestStreak:0,curStreak:0,rating:1200}}
