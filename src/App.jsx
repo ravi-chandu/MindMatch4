@@ -1,12 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-/** MindMatch 4 — V2.3 (mobile fit + BASE assets + taunts)
- * - Smaller mobile board/discs; no bottom scroll (dynamic offset)
- * - Desktop vs mobile layout
- * - Column Preferences compress to fit
- * - Last move highlight (~2.3s) before celebration
- * - AI taunts on win/lose/draw
- */
+
 
 const BASE = import.meta.env.BASE_URL || "/";
 
