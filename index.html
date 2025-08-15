@@ -10,7 +10,6 @@
     <!-- SEO -->
     <meta name="description" content="MindMatch 4 is an adaptive Connect Four game. The AI learns your style and gets harder as you win. Play vs AI or local multiplayer." />
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
-
     <!-- Social -->
     <meta property="og:title" content="MindMatch 4 — Adaptive Connect Four" />
     <meta property="og:description" content="Beat the AI… if you can. It learns your strategy and ramps up." />
@@ -20,14 +19,14 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
 
-    <!-- Icons (all files live in /public) -->
+    <!-- Icons (from /public) -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="/logo-32.png" />
     <link rel="icon" type="image/png" sizes="64x64" href="/logo-64.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/logo-192.png" />
     <link rel="apple-touch-icon" sizes="512x512" href="/logo-512.png" />
 
-    <!-- Base theme tokens -->
+    <!-- Base tokens -->
     <style>
       :root{
         --bg:#ffffff; --bg2:#f3f4f6; --ink:#111827; --muted:#6b7280;
@@ -35,12 +34,14 @@
         --hole:#e5e7eb; --grid:#d1d5db;
         --red:#ef4444; --yellow:#fbbf24; --green:#16a34a;
         --cell:56px; --gap:10px; --disc-pad:10px;
+        --shadow:0 10px 30px rgba(0,0,0,.12);
       }
       @media (prefers-color-scheme: dark){
         :root{
           --bg:#0b1222; --bg2:#0f172a; --ink:#e5e7eb; --muted:#94a3b8;
           --panel:rgba(17,24,39,.85); --panel-border:rgba(255,255,255,.08);
           --hole:#0f172a; --grid:#1f2937;
+          --shadow:0 14px 36px rgba(0,0,0,.42);
         }
       }
       [data-theme="light"]{
