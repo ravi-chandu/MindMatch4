@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-    <title>MindMatch 4 — Adaptive Connect Four | Smart Mind Game</title>
 
-    <!-- SEO -->
+    <title>MindMatch 4 — Adaptive Connect Four | Smart Mind Game</title>
     <meta name="description" content="MindMatch 4 is an adaptive Connect Four game. The AI learns your style and gets harder as you win. Play vs AI or local multiplayer." />
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
     <meta property="og:title" content="MindMatch 4 — Adaptive Connect Four" />
@@ -18,12 +17,12 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
 
-    <!-- Icons from /public -->
-    <link rel="icon" href="/favicon.ico" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/logo-32.png" />
-    <link rel="icon" type="image/png" sizes="64x64" href="/logo-64.png" />
-    <link rel="apple-touch-icon" sizes="192x192" href="/logo-192.png" />
-    <link rel="apple-touch-icon" sizes="512x512" href="/logo-512.png" />
+    <!-- Use %BASE_URL% so icons resolve under /MindMatch4/ on Pages -->
+    <link rel="icon" href="%BASE_URL%favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="%BASE_URL%logo-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="%BASE_URL%logo-64.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="%BASE_URL%logo-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="%BASE_URL%logo-512.png" />
 
     <style>
       :root{
@@ -31,7 +30,7 @@
         --panel:rgba(255,255,255,.92); --panel-border:rgba(0,0,0,.08);
         --hole:#e5e7eb; --grid:#d1d5db;
         --red:#ef4444; --yellow:#fbbf24; --green:#16a34a;
-        --cell:56px; --gap:10px; --disc-pad:10px;
+        --cell:56px; --gap:10px; --disc-pad:10px; --dyn-offset:134px;
         --shadow:0 10px 30px rgba(0,0,0,.12);
       }
       @media (prefers-color-scheme: dark){
