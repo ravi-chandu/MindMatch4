@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-/** MindMatch 4 — V2.2
- * - Smaller mobile board/discs, no scroll
+/** MindMatch 4 — V2.3 (mobile fit + BASE assets + taunts)
+ * - Smaller mobile board/discs; no bottom scroll (dynamic offset)
  * - Desktop vs mobile layout
  * - Column Preferences compress to fit
  * - Last move highlight (~2.3s) before celebration
+ * - AI taunts on win/lose/draw
  */
+
+const BASE = import.meta.env.BASE_URL || "/";
 
 const ROWS=6, COLS=7, HUMAN=1, AI=2;
 const LS_PROFILE="mm4_profile_v10";
@@ -136,15 +139,30 @@ const haptic=(ms=12)=>{try{navigator.vibrate&&navigator.vibrate(ms);}catch{}};
 
 /* ---------- helpers ---------- */
 const parseQuery=()=>{const sp=new URLSearchParams(location.search); const q=Object.fromEntries(sp.entries()); ["target","depth","rand"].forEach(k=>q[k]=q[k]!==undefined?Number(q[k]):undefined); return q}
-function findRowOf(col, b){ // row index of piece just placed in a column
-  for(let r=0;r<ROWS;r++){
-    if(b[r][col]!==0){
-      let rr=r; while(rr+1<ROWS && b[rr+1][col]!==0) rr++;
-      return rr;
-    }
-  }
-  return null;
-}
+function findRowOf(col, b){ for(let r=0;r<ROWS;r++){ if(b[r][col]!==0){ let rr=r; while(rr+1<ROWS && b[rr+1][col]!==0) rr++; return rr; } } return null; }
+
+/* ---------- taunts ---------- */
+const TAUNTS = {
+  aiWin: [
+    "Too easy. Want a rematch?",
+    "You blinked. Try again?",
+    "One step ahead. Beat me now.",
+    "Checkmate vibes. Rematch?"
+  ],
+  aiLose: [
+    "Nice one… but can you do it twice?",
+    "Lucky? Prove it with a rematch.",
+    "You got me—this time. Again?",
+    "Okay, you’re good. Best two of three?"
+  ],
+  draw: [
+    "Evenly matched. Break the tie?",
+    "Close! One more?",
+    "Stalemate. Settle this?",
+    "Neck and neck. Go again!"
+  ]
+};
+const pick = (arr)=>arr[Math.floor(Math.random()*arr.length)];
 
 /* ---------- App ---------- */
 export default function App(){
@@ -170,14 +188,12 @@ export default function App(){
   const rootRef=useRef(null);
   const boardPanelRef=useRef(null);
 
-  /* ---------- auto-fit ---------- */
+  /* ---------- auto-fit (no bottom scroll) ---------- */
   useEffect(()=>{
     let raf1=0, raf2=0, tmo=0;
     const fit=()=>{
       const root=rootRef.current, panel=boardPanelRef.current;
       if(!root||!panel) return;
-      const styles=getComputedStyle(document.documentElement);
-      const gap=parseFloat(styles.getPropertyValue("--gap"))||10;
 
       const header=root.querySelector(".mm4-header");
       const status=root.querySelector(".mm4-status");
@@ -188,20 +204,25 @@ export default function App(){
       const vh=Math.max(innerHeight,document.documentElement.clientHeight);
       const isDesktop=vw>=900;
 
-      const safety=isDesktop?24:84; // reserve for actions + stats
-      const availH=vh-headerH-statusH-safety;
+      const safety=isDesktop?28:110;
+      const dynOffset=headerH+statusH+safety;
+      document.documentElement.style.setProperty("--dyn-offset", `${Math.round(dynOffset)}px`);
+
+      const styles=getComputedStyle(document.documentElement);
+      const gap0=parseFloat(styles.getPropertyValue("--gap"))||10;
 
       const panelRect=panel.getBoundingClientRect();
       const availW=isDesktop?panelRect.width:vw-24;
+      const availH=vh-dynOffset;
 
-      const cellW=(availW-gap*(COLS-1)-gap*2)/COLS;
-      const cellH=(availH-gap*(ROWS-1)-gap*2)/ROWS;
-      let cell=Math.floor(Math.max(24,Math.min(cellW,cellH)));
-      cell=Math.min(cell,isDesktop?72:52);  // smaller on phones
+      const cellW=(availW-gap0*(COLS-1)-gap0*2)/COLS;
+      const cellH=(availH-gap0*(ROWS-1)-gap0*2)/ROWS;
+      let cell=Math.floor(Math.max(22,Math.min(cellW,cellH)));
+      cell=Math.min(cell,isDesktop?72:50); // smaller on phones
 
       document.documentElement.style.setProperty("--cell",`${cell}px`);
-      document.documentElement.style.setProperty("--disc-pad",`${Math.round(cell*0.18)}px`);
-      document.documentElement.style.setProperty("--gap",`${Math.max(6,Math.round(cell*0.16))}px`);
+      document.documentElement.style.setProperty("--disc-pad",`${Math.round(cell*0.16)}px`);
+      document.documentElement.style.setProperty("--gap",`${Math.max(5,Math.round(cell*0.14))}px`);
     };
     const schedule=()=>{ cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); clearTimeout(tmo);
       raf1=requestAnimationFrame(()=>{ raf2=requestAnimationFrame(fit); });
@@ -241,10 +262,10 @@ export default function App(){
         const {score}=minimax(child, Math.max(0,depth-1), false, style, profile.humanColumnFreq);
         return {col,score:score-(profile.humanColumnFreq[col]||0)*1.8};
       }).sort((a,b)=>b.score-a.score);
-      const pick=(Math.random()<randomness && scored.length>1)
+      const pickCol=(Math.random()<randomness && scored.length>1)
         ? scored[Math.min(2,Math.floor(Math.random()*Math.min(3,scored.length)))].col
         : scored[0].col;
-      playAI(pick);
+      playAI(pickCol);
     },140);
     return ()=>clearTimeout(t);
   },[turn,over,board,profile,query,screen]);
@@ -297,7 +318,7 @@ export default function App(){
     return (
       <div ref={rootRef} style={ui.page}>
         <header className="mm4-header" style={ui.header}>
-          <img src="/logo-128.png" alt="MindMatch 4" width="40" height="40" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
+          <img src={`${BASE}logo-128.png`} alt="MindMatch 4" width="40" height="40" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
           <div style={{flex:1,textAlign:"center"}}>
             <div style={ui.h1}>MindMatch 4</div>
             <div style={ui.tagline}>Beat the adaptive AI.</div>
@@ -318,9 +339,9 @@ export default function App(){
           <section style={ui.help}>
             <h2 style={ui.h2}>How to win</h2>
             <div style={ui.steps} className="mm4-help-steps">
-              <HowTo img="/howto-win-horizontal.gif" text="Horizontal — four across."/>
-              <HowTo img="/howto-win-vertical.gif" text="Vertical — four stacked."/>
-              <HowTo img="/howto-win-diagonal.gif" text="Diagonal — four in a slope."/>
+              <HowTo img={`${BASE}howto-win-horizontal.gif`} text="Horizontal — four across."/>
+              <HowTo img={`${BASE}howto-win-vertical.gif`}   text="Vertical — four stacked."/>
+              <HowTo img={`${BASE}howto-win-diagonal.gif`}   text="Diagonal — four in a slope."/>
             </div>
             <ul style={ui.list}>
               <li>Tap a column to drop your disc. Discs stack from the bottom.</li>
@@ -337,7 +358,7 @@ export default function App(){
   return (
     <div ref={rootRef} style={ui.page}>
       <header className="mm4-header" style={ui.header}>
-        <img src="/logo-128.png" alt="MindMatch 4" width="36" height="36" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
+        <img src={`${BASE}logo-128.png`} alt="MindMatch 4" width="36" height="36" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
         <div style={{textAlign:"center",flex:1}}>
           <div style={ui.h1Small}>MindMatch 4</div>
           <div style={ui.taglineSmall}>{screen==="vsai" ? "Beat the adaptive AI." : "Local hot‑seat: P1 vs P2"}</div>
@@ -433,7 +454,9 @@ export default function App(){
               {overlay==='win'?"You win! 🎉":overlay==='lose'?"You lost":"Draw"}
             </div>
             <div style={{...ui.muted,marginBottom:10}}>
-              {overlay==='win' ? "Nice! Try to push your streak." : overlay==='lose' ? "Go again—you’ll get it." : "Evenly matched!"}
+              {overlay==='win'  ? pick(TAUNTS.aiLose) :
+               overlay==='lose' ? pick(TAUNTS.aiWin)  :
+                                  pick(TAUNTS.draw)}
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"center"}}>
               <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setOverlay(null); reset();}}>Play Again</button>
@@ -485,7 +508,11 @@ const ui={
   stepText:{fontSize:14},
   list:{margin:"10px 0 0",paddingLeft:18,fontSize:14,lineHeight:1.6},
   status:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 12px 6px"},
-  main:{maxWidth:1200,margin:"0 auto",padding:"0 12px",display:"grid",gridTemplateColumns:"1fr",gap:12,height:"calc(100svh - 134px)"},
+  main:{
+    maxWidth:1200,margin:"0 auto",padding:"0 12px",
+    display:"grid",gridTemplateColumns:"1fr",gap:12,
+    height:"calc(100svh - var(--dyn-offset, 134px))"
+  },
   panel:{background:"var(--panel)",border:"1px solid var(--panel-border)",borderRadius:16,padding:12,boxShadow:"var(--shadow)",minHeight:0,overflow:"hidden"},
   boardWrap:{display:"grid",placeItems:"center",height:"100%"},
   boardFrame:{position:"relative",borderRadius:16,padding:"calc(var(--gap)*.6)",background:"linear-gradient(180deg,#0b162b,#0a1222)",height:"100%",width:"fit-content",maxWidth:"100%"},
@@ -497,7 +524,7 @@ const ui={
   actions:{display:"flex",gap:8,justifyContent:"center",marginTop:8,flexWrap:"wrap"},
   bars:{display:"flex",gap:6,alignItems:"end"},
   bar:{flex:1},
-  barOuter:{height:"clamp(48px, 7.2vh, 70px)",background:"rgba(148,163,184,.35)",borderRadius:"6px 6px 0 0",overflow:"hidden",display:"flex",alignItems:"end"},
+  barOuter:{height:"clamp(44px, 6.5vh, 64px)",background:"rgba(148,163,184,.35)",borderRadius:"6px 6px 0 0",overflow:"hidden",display:"flex",alignItems:"end"},
   barInner:{width:"100%",background:"var(--green)"},
   input:{padding:"8px 10px",borderRadius:10,border:"1px solid var(--panel-border)",background:"var(--panel)",color:"var(--ink)",width:"100%"},
   overlay:{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"grid",placeItems:"center",padding:16},
@@ -507,6 +534,23 @@ const ui={
 
 // responsive CSS rules appended once
 const styleEl=document.createElement("style");
-styleEl.textContent=`@media (min-width:900px){ .mm4-main{grid-template-columns:minmax(0,1fr) 320px;} .mm4-help-steps{grid-template-columns:repeat(3,1fr);} } @media (max-width:899px){ .mm4-main{ height: calc(100svh - 132px); } button{ padding: 9px 12px; } }`;
+styleEl.textContent=`
+@media (min-width:900px){
+  .mm4-main{grid-template-columns:minmax(0,1fr) 320px;}
+  .mm4-help-steps{grid-template-columns:repeat(3,1fr);}
+}
+@media (max-width:899px){
+  .mm4-main{ height: calc(100svh - var(--dyn-offset, 134px)); }
+  button{ padding: 9px 12px; }
+}`;
 document.head.appendChild(styleEl);
 
+// extra small-screen tweaks
+const styleEl2 = document.createElement("style");
+styleEl2.textContent = `
+  @media (max-width: 899px){
+    .mm4-main{ height: calc(100svh - var(--dyn-offset, 134px)); }
+    button{ padding: 8px 12px; }
+  }
+`;
+document.head.appendChild(styleEl2);
