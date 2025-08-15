@@ -510,6 +510,3 @@ const styleEl=document.createElement("style");
 styleEl.textContent=`@media (min-width:900px){ .mm4-main{grid-template-columns:minmax(0,1fr) 320px;} .mm4-help-steps{grid-template-columns:repeat(3,1fr);} } @media (max-width:899px){ .mm4-main{ height: calc(100svh - 132px); } button{ padding: 9px 12px; } }`;
 document.head.appendChild(styleEl);
 
-/* ---------- defaults ---------- */
-function defProfile(){return{humanColumnFreq:Array(COLS).fill(0),lastTen:[],aiConfig:{depth:4,randomness:0.2,style:"balanced"}}}
-function defStats(){return{games:0,wins:0,losses:0,draws:0,bestStreak:0,curStreak:0,rating:1200}}
