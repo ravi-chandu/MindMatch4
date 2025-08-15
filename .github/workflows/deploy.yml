@@ -1,4 +1,4 @@
-name: Deploy Vite React app to GitHub Pages
+name: Deploy MindMatch4 to GitHub Pages
 
 on:
   push:
@@ -18,23 +18,33 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-      # Use npm install (works with/without lockfile)
-      - run: npm install
-      - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+          # cache removed because there's no lockfile
+
+      - name: Install deps
+        run: npm install --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
+
   deploy:
     needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
-      - id: deployment
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
