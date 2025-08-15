@@ -1,112 +1,182 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-/** MindMatch 4 — production build
- * - Auto-fit board (no scroll/overlap)
- * - System theme default (no attribute unless user chooses)
- * - Home: Play vs AI & Local hot‑seat
- * - Instructions: horizontal, vertical, diagonal win GIFs
+/** MindMatch 4 — V2
+ * - Stronger mobile layout (no overlap, near-zero jank)
+ * - Safer sizing: debounced + 2x rAF + ResizeObserver
+ * - Precomputed windows for faster evaluation
+ * - System theme by default (no attribute until user selects)
+ * - Home with real win-type GIFs
+ * - Gentle haptics on drop/win (mobile)
  */
 
 const ROWS=6, COLS=7, HUMAN=1, AI=2;
-const LS_PROFILE="mm4_profile_v8";
-const LS_STATS="mm4_stats_v8";
+const LS_PROFILE="mm4_profile_v9";
+const LS_STATS="mm4_stats_v9";
 const LS_NAME="mm4_name";
 const LS_THEME="mm4_theme"; // "system" | "light" | "dark"
 
-const clone=b=>b.map(r=>r.slice());
-const empty=()=>Array.from({length:ROWS},()=>Array(COLS).fill(0));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const emptyBoard=()=>Array.from({length:ROWS},()=>Array(COLS).fill(0));
+const clone=b=>b.map(r=>r.slice());
 
-/* ---------- theme ---------- */
+// --- Precompute all 4-in-a-row windows (faster eval/winner)
+const WINDOWS=[];
+(function makeWindows(){
+  // horizontal
+  for(let r=0;r<ROWS;r++) for(let c=0;c<=COLS-4;c++)
+    WINDOWS.push([[r,c],[r,c+1],[r,c+2],[r,c+3]]);
+  // vertical
+  for(let c=0;c<COLS;c++) for(let r=0;r<=ROWS-4;r++)
+    WINDOWS.push([[r,c],[r+1,c],[r+2,c],[r+3,c]]);
+  // diag down-right
+  for(let r=0;r<=ROWS-4;r++) for(let c=0;c<=COLS-4;c++)
+    WINDOWS.push([[r,c],[r+1,c+1],[r+2,c+2],[r+3,c+3]]);
+  // diag up-right
+  for(let r=3;r<ROWS;r++) for(let c=0;c<=COLS-4;c++)
+    WINDOWS.push([[r,c],[r-1,c+1],[r-2,c+2],[r-3,c+3]]);
+})();
+
+// --- theme
 function applyTheme(mode){ if(mode==="system"||!mode){document.documentElement.removeAttribute("data-theme");return;} document.documentElement.setAttribute("data-theme",mode); }
-function useTheme(){
-  const cached=localStorage.getItem(LS_THEME);
-  const init=(cached==="light"||cached==="dark"||cached==="system")?cached:"system";
-  const [mode,setMode]=useState(init);
-  useEffect(()=>{applyTheme(mode);localStorage.setItem(LS_THEME,mode||"system");},[mode]);
-  return [mode,setMode];
-}
+function useTheme(){ const t=localStorage.getItem(LS_THEME); const init=(t==="light"||t==="dark"||t==="system")?t:"system"; const [mode,setMode]=useState(init); useEffect(()=>{applyTheme(mode);localStorage.setItem(LS_THEME,mode||"system");},[mode]); return [mode,setMode]; }
 
-/* ---------- storage ---------- */
+// --- storage
 function defProfile(){return{humanColumnFreq:Array(COLS).fill(0),lastTen:[],aiConfig:{depth:4,randomness:0.2,style:"balanced"}}}
-function loadProfile(){try{const s=localStorage.getItem(LS_PROFILE); if(!s) return defProfile(); const p=JSON.parse(s); return {...defProfile(),...p,aiConfig:{...defProfile().aiConfig,...(p.aiConfig||{})}}}catch{return defProfile()}}
+function loadProfile(){try{const s=localStorage.getItem(LS_PROFILE); if(!s) return defProfile(); const p=JSON.parse(s); return {...defProfile(),...p, aiConfig:{...defProfile().aiConfig, ...(p.aiConfig||{})}}}catch{return defProfile()}}
 function saveProfile(p){localStorage.setItem(LS_PROFILE,JSON.stringify(p))}
 function defStats(){return{games:0,wins:0,losses:0,draws:0,bestStreak:0,curStreak:0,rating:1200}}
 function loadStats(){try{return JSON.parse(localStorage.getItem(LS_STATS))||defStats()}catch{return defStats()}}
 function saveStats(s){localStorage.setItem(LS_STATS,JSON.stringify(s))}
 
-/* ---------- misc ---------- */
-const parseQuery=()=>{const sp=new URLSearchParams(location.search); const q=Object.fromEntries(sp.entries()); ["target","depth","rand"].forEach(k=>q[k]=q[k]!==undefined?Number(q[k]):undefined); return q}
-
-/* ---------- board ---------- */
+// --- board core
 function drop(b,col,pl){ if(b[0][col]!==0) return null; const nb=clone(b); for(let r=ROWS-1;r>=0;r--) if(nb[r][col]===0){nb[r][col]=pl; return nb} return null }
-function moves(b){const m=[]; for(let c=0;c<COLS;c++) if(b[0][c]===0) m.push(c); return m}
+function availableMoves(b){ const m=[]; for(let c=0;c<COLS;c++) if(b[0][c]===0) m.push(c); return m; }
 function winner(b){
-  const dirs=[[0,1],[1,0],[1,1],[1,-1]], inB=(r,c)=>r>=0&&r<ROWS&&c>=0&&c<COLS;
-  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ const p=b[r][c]; if(!p) continue;
-    for(const[dr,dc] of dirs){ let k=1, nr=r+dr, nc=c+dc; while(inB(nr,nc)&&b[nr][nc]===p){ if(++k>=4) return p; nr+=dr; nc+=dc; } }
+  for(const w of WINDOWS){
+    const a=b[w[0][0]][w[0][1]], b1=b[w[1][0]][w[1][1]], c=b[w[2][0]][w[2][1]], d=b[w[3][0]][w[3][1]];
+    if(a!==0 && a===b1 && a===c && a===d) return a;
   }
-  return moves(b).length?0:3;
+  return availableMoves(b).length?0:3;
 }
 
-/* ---------- AI ---------- */
-function evalWin(w, player){
-  const opp=player===AI?HUMAN:AI, cp=w.filter(x=>x===player).length, co=w.filter(x=>x===opp).length, ce=w.filter(x=>x===0).length;
-  if(cp===4) return 100000;
-  if(cp===3 && ce===1) return 200;
-  if(cp===2 && ce===2) return 40;
-  if(co===3 && ce===1) return -180;
-  if(co===2 && ce===2) return -30;
+// --- AI eval (windows-based = faster)
+function evalWindow(vals, me){
+  const you = me===AI?HUMAN:AI;
+  const countMe=vals.filter(v=>v===me).length;
+  const countYou=vals.filter(v=>v===you).length;
+  const empty=vals.filter(v=>v===0).length;
+  if(countMe===4) return 100000;
+  if(countMe===3 && empty===1) return 220;
+  if(countMe===2 && empty===2) return 50;
+  if(countYou===3 && empty===1) return -200;
+  if(countYou===2 && empty===2) return -40;
   return 0;
 }
-function scorePos(b, player, style="balanced"){
-  let s=0, center=Math.floor(COLS/2);
-  for(let r=0;r<ROWS;r++) if(b[r][center]===player) s+=8;
-  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS-3;c++) s+=evalWin([b[r][c],b[r][c+1],b[r][c+2],b[r][c+3]], player);
-  for(let c=0;c<COLS;c++) for(let r=0;r<ROWS-3;r++) s+=evalWin([b[r][c],b[r+1][c],b[r+2][c],b[r+3][c]], player);
-  for(let r=0;r<ROWS-3;r++) for(let c=0;c<COLS-3;c++) s+=evalWin([b[r][c],b[r+1][c+1],b[r+2][c+2],b[r+3][c+3]], player);
-  for(let r=3;r<ROWS;r++) for(let c=0;c<COLS-3;c++) s+=evalWin([b[r][c],b[r-1][c+1],b[r-2][c+2],b[r-3][c+3]], player);
-  if(style==="aggressive") s*=1.08; else if(style==="defensive") s*=0.98;
+function scorePosition(b, me, style="balanced"){
+  let s=0;
+  // center bias
+  const center=Math.floor(COLS/2);
+  for(let r=0;r<ROWS;r++) if(b[r][center]===me) s+=9;
+  for(const w of WINDOWS){
+    const vals=[b[w[0][0]][w[0][1]],b[w[1][0]][w[1][1]],b[w[2][0]][w[2][1]],b[w[3][0]][w[3][1]]];
+    s+=evalWindow(vals, me);
+  }
+  if(style==="aggressive") s*=1.06; else if(style==="defensive") s*=0.98;
   return s;
 }
-function minimax(b,d,maxing,style,bias,alpha=-Infinity,beta=Infinity){
+
+// --- minimax + alpha-beta + small transposition cache
+const TT_MAX=4000; const TT=new Map();
+function ttKey(b, turn, depth){
+  // compact key: top heights per col + turn + depth
+  const heights=Array(COLS).fill(0);
+  for(let c=0;c<COLS;c++){ let h=0; for(let r=0;r<ROWS;r++) if(b[r][c]!==0){h=ROWS-r; break;} heights[c]=h; }
+  return `${heights.join("")}|${turn}|${depth}`;
+}
+function minimax(b, depth, maximizing, style, bias, alpha=-Infinity, beta=Infinity){
   const w=winner(b);
-  if(d===0||w){ if(w===AI) return{score:1e9}; if(w===HUMAN) return{score:-1e9}; if(w===3) return{score:0}; return{score:scorePos(b,AI,style)}; }
-  const ms=moves(b).sort((a,c)=>Math.abs(a-3)-Math.abs(c-3)), pen=c=>(bias[c]||0)*1.5;
-  if(maxing){ let best={score:-Infinity,col:ms[0]}; for(const c of ms){const child=drop(b,c,AI); if(!child) continue; let{score}=minimax(child,d-1,false,style,bias,alpha,beta); score-=pen(c); if(score>best.score) best={score,col:c}; alpha=Math.max(alpha,score); if(beta<=alpha) break;} return best; }
-  let best={score:Infinity,col:ms[0]}; for(const c of ms){const child=drop(b,c,HUMAN); if(!child) continue; let{score}=minimax(child,d-1,true,style,bias,alpha,beta); score+=pen(c); if(score<best.score) best={score,col:c}; beta=Math.min(beta,score); if(beta<=alpha) break;} return best;
+  if(depth===0 || w){
+    if(w===AI) return {score:1e9};
+    if(w===HUMAN) return {score:-1e9};
+    if(w===3) return {score:0};
+    return {score:scorePosition(b, AI, style)};
+  }
+
+  const key=ttKey(b, maximizing?AI:HUMAN, depth);
+  if(TT.has(key)) return TT.get(key);
+
+  const ms=availableMoves(b).sort((a,c)=>Math.abs(a-3)-Math.abs(c-3));
+  const pen=(c)=>(bias[c]||0)*1.25;
+
+  if(maximizing){
+    let best={score:-Infinity,col:ms[0]};
+    for(const c of ms){
+      const child=drop(b,c,AI); if(!child) continue;
+      let {score}=minimax(child, depth-1, false, style, bias, alpha, beta);
+      score-=pen(c);
+      if(score>best.score) best={score,col:c};
+      alpha=Math.max(alpha,score); if(beta<=alpha) break;
+    }
+    if(TT.size>TT_MAX){ TT.clear(); }
+    TT.set(key,best); return best;
+  }else{
+    let best={score:Infinity,col:ms[0]};
+    for(const c of ms){
+      const child=drop(b,c,HUMAN); if(!child) continue;
+      let {score}=minimax(child, depth-1, true, style, bias, alpha, beta);
+      score+=pen(c);
+      if(score<best.score) best={score,col:c};
+      beta=Math.min(beta,score); if(beta<=alpha) break;
+    }
+    if(TT.size>TT_MAX){ TT.clear(); }
+    TT.set(key,best); return best;
+  }
 }
 
-/* ---------- adapt & stats ---------- */
-function adapt(p,s){ const wr=(s.wins||0)/Math.max(1,s.games||0), streaky=(s.curStreak||0)>=3;
+// --- adapt & stats
+function adapt(profile, stats){
+  const wr=(stats.wins||0)/Math.max(1,stats.games||0);
+  const streaky=(stats.curStreak||0)>=3;
   const depth=Math.round(3+4*clamp(wr*1.4,0,1));
   const randomness=Math.max(0.05,0.35-wr*0.4-(streaky?0.08:0));
-  const center=(p.humanColumnFreq[3]||0)+(p.humanColumnFreq[2]||0)+(p.humanColumnFreq[4]||0);
-  const edge=(p.humanColumnFreq[0]||0)+(p.humanColumnFreq[1]||0)+(p.humanColumnFreq[5]||0)+(p.humanColumnFreq[6]||0);
-  p.aiConfig={depth, randomness:Number(randomness.toFixed(2)), style:center>=edge?"defensive":"aggressive"}; return p;
+  const center=(profile.humanColumnFreq[3]||0)+(profile.humanColumnFreq[2]||0)+(profile.humanColumnFreq[4]||0);
+  const edge=(profile.humanColumnFreq[0]||0)+(profile.humanColumnFreq[1]||0)+(profile.humanColumnFreq[5]||0)+(profile.humanColumnFreq[6]||0);
+  profile.aiConfig={depth, randomness:Number(randomness.toFixed(2)), style:center>=edge?"defensive":"aggressive"};
+  return profile;
 }
-function updStats(s,res){ const n={...s}; n.games++; if(res==='W'){n.wins++; n.curStreak++; n.bestStreak=Math.max(n.bestStreak,n.curStreak); n.rating+=12+Math.max(0,6-Math.floor(n.curStreak/2));}
-  else if(res==='L'){n.losses++; n.curStreak=0; n.rating-=10;} else {n.draws++; n.rating-=2;} n.rating=clamp(Math.round(n.rating),600,3000); return n; }
+function updStats(s,res){
+  const n={...s}; n.games++;
+  if(res==='W'){ n.wins++; n.curStreak++; n.bestStreak=Math.max(n.bestStreak,n.curStreak); n.rating+=12+Math.max(0,6-Math.floor(n.curStreak/2));}
+  else if(res==='L'){ n.losses++; n.curStreak=0; n.rating-=10; }
+  else { n.draws++; n.rating-=2; }
+  n.rating=clamp(Math.round(n.rating),600,3000); return n;
+}
 
-/* ---------- confetti ---------- */
-function confetti(ms=1000){
-  const old=document.getElementById("mm4-confetti"); if(old) old.remove();
+// --- confetti + haptics
+function confetti(ms=950){
+  const existing=document.getElementById("mm4-confetti"); if(existing) existing.remove();
   const c=document.createElement("canvas"); c.id="mm4-confetti"; document.body.appendChild(c);
-  const ctx=c.getContext("2d"); const resize=()=>{c.width=innerWidth; c.height=innerHeight}; resize(); addEventListener("resize",resize,{once:true});
+  const ctx=c.getContext("2d"); const resize=()=>{c.width=innerWidth; c.height=innerHeight}; resize();
   const cols=["#ef4444","#f59e0b","#10b981","#38bdf8","#a78bfa"];
-  const ps=Array.from({length:100},()=>({x:Math.random()*c.width,y:-20-Math.random()*c.height*.4,vx:(Math.random()-.5)*5,vy:3+Math.random()*4,g:.18+Math.random()*.18,w:8+Math.random()*6,h:12+Math.random()*8,a:Math.random()*Math.PI,s:(Math.random()<.5?-1:1)*(.1+Math.random()*.2),color:cols[Math.floor(Math.random()*cols.length)]}));
-  const stop=performance.now()+ms; const tick=t=>{ctx.clearRect(0,0,c.width,c.height); ps.forEach(p=>{p.vy+=p.g; p.x+=p.vx; p.y+=p.vy; p.a+=p.s; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.a); ctx.fillStyle=p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore();}); if(t<stop) requestAnimationFrame(tick); else c.remove();}; requestAnimationFrame(tick);
+  const ps=Array.from({length:90},()=>({x:Math.random()*c.width,y:-20-Math.random()*c.height*.4,vx:(Math.random()-.5)*4,vy:3+Math.random()*3.5,g:.18+Math.random()*.18,w:8+Math.random()*6,h:12+Math.random()*8,a:Math.random()*Math.PI,s:(Math.random()<.5?-1:1)*(.1+Math.random()*.2),color:cols[Math.floor(Math.random()*cols.length)]}));
+  const end=performance.now()+ms;
+  const tick=t=>{ctx.clearRect(0,0,c.width,c.height); for(const p of ps){p.vy+=p.g;p.x+=p.vx;p.y+=p.vy;p.a+=p.s;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.fillStyle=p.color;ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);ctx.restore();} if(t<end) requestAnimationFrame(tick); else c.remove();};
+  requestAnimationFrame(tick);
 }
+const haptic=(ms=12)=>{try{if(navigator.vibrate) navigator.vibrate(ms);}catch{}};
 
-/* ---------- App ---------- */
+// --- helpers
+const parseQuery=()=>{const sp=new URLSearchParams(location.search); const q=Object.fromEntries(sp.entries()); ["target","depth","rand"].forEach(k=>q[k]=q[k]!==undefined?Number(q[k]):undefined); return q}
+
+// --- App
 export default function App(){
   const query=useMemo(()=>parseQuery(),[]);
   const [theme,setTheme]=useTheme();
 
   const [screen,setScreen]=useState("menu"); // "menu" | "vsai" | "local"
-  const [board,setBoard]=useState(()=>empty());
+  const [board,setBoard]=useState(()=>emptyBoard());
   const [turn,setTurn]=useState(HUMAN);
-  const [status,setStatus]=useState("Your turn");
+  const [status,setStatus]=useState("");
   const [profile,setProfile]=useState(()=>loadProfile());
   const [stats,setStats]=useState(()=>loadStats());
   const [overlay,setOverlay]=useState(null);
@@ -116,57 +186,57 @@ export default function App(){
   const w=useMemo(()=>winner(board),[board]);
   const over=w!==0;
 
-  // safe auto-fit
+  // refs for sizing
   const rootRef=useRef(null);
   const boardPanelRef=useRef(null);
+
+  // safer auto-fit (JS only adjusts CSS vars)
   useEffect(()=>{
-    function fit(){
+    let raf1=0, raf2=0, tmo=0;
+    const fit=()=>{
       const root=rootRef.current, panel=boardPanelRef.current;
       if(!root||!panel) return;
       const styles=getComputedStyle(document.documentElement);
       const gap=parseFloat(styles.getPropertyValue("--gap"))||10;
-      const headerH=root.querySelector(".mm4-header")?.getBoundingClientRect().height||0;
-      const statusH=root.querySelector(".mm4-status")?.getBoundingClientRect().height||0;
+
+      const header=root.querySelector(".mm4-header");
+      const status=root.querySelector(".mm4-status");
+      const headerH=header?header.getBoundingClientRect().height:0;
+      const statusH=status?status.getBoundingClientRect().height:0;
+
       const vw=Math.max(innerWidth,document.documentElement.clientWidth);
       const vh=Math.max(innerHeight,document.documentElement.clientHeight);
       const isDesktop=vw>=900;
+
       const availH=vh-headerH-statusH-24;
       const panelRect=panel.getBoundingClientRect();
       const availW=isDesktop?panelRect.width:vw-24;
+
       const cellW=(availW-gap*(COLS-1)-gap*2)/COLS;
       const cellH=(availH-gap*(ROWS-1)-gap*2)/ROWS;
       let cell=Math.floor(Math.max(28,Math.min(cellW,cellH)));
-      cell=Math.min(cell,isDesktop?72:56);
+      cell=Math.min(cell,isDesktop?72:58); // slightly larger on mobile for V2
+
       document.documentElement.style.setProperty("--cell",`${cell}px`);
       document.documentElement.style.setProperty("--disc-pad",`${Math.round(cell*0.18)}px`);
       document.documentElement.style.setProperty("--gap",`${Math.max(6,Math.round(cell*0.18))}px`);
-    }
-    const rafFit=()=>requestAnimationFrame(()=>requestAnimationFrame(fit));
-    rafFit();
-    const ro=new ResizeObserver(rafFit);
+    };
+    const schedule=()=>{ cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); clearTimeout(tmo);
+      raf1=requestAnimationFrame(()=>{ raf2=requestAnimationFrame(fit); });
+      // safety debounce for font reflow
+      tmo=setTimeout(fit,60);
+    };
+    schedule();
+    const ro=new ResizeObserver(schedule);
     ro.observe(document.body);
-    addEventListener("resize",rafFit);
-    addEventListener("orientationchange",rafFit);
-    return ()=>{ro.disconnect();removeEventListener("resize",rafFit);removeEventListener("orientationchange",rafFit);};
+    addEventListener("resize",schedule); addEventListener("orientationchange",schedule);
+    return ()=>{ ro.disconnect(); removeEventListener("resize",schedule); removeEventListener("orientationchange",schedule); cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); clearTimeout(tmo); };
   },[]);
 
-  // adapt on mount
-  useEffect(()=>{const p=adapt({...profile},{...stats}); saveProfile(p); setProfile(p);/*eslint-disable-next-line*/},[]);
+  // initial adapt
+  useEffect(()=>{ const p=adapt({...profile},{...stats}); saveProfile(p); setProfile(p); /* eslint-disable-next-line */},[]);
 
-  // AI move
-  useEffect(()=>{
-    if(screen!=="vsai") return;
-    if(turn!==AI || over) return;
-    const t=setTimeout(()=>{
-      const mv=decide(board,profile,query);
-      if(mv==null) return;
-      const nb=drop(board,mv,AI); if(!nb) return;
-      setBoard(nb); setTurn(HUMAN);
-    },160);
-    return ()=>clearTimeout(t);
-  },[turn,over,board,profile,query,screen]);
-
-  // status
+  // status text
   useEffect(()=>{
     if(screen==="menu"){ setStatus(""); return; }
     if (w===HUMAN) setStatus(screen==="vsai"?"You win! 🎉":"Player 1 wins! 🎉");
@@ -175,71 +245,84 @@ export default function App(){
     else setStatus(turn===HUMAN? (screen==="vsai"?"Your turn":"P1 turn") : (screen==="vsai"?"AI thinking…":"P2 turn"));
   },[turn,w,screen]);
 
-  // end of game
+  // AI move (after brief delay)
+  useEffect(()=>{
+    if(screen!=="vsai"||turn!==AI||over) return;
+    const t=setTimeout(()=>{
+      const ms=availableMoves(board); if(!ms.length) return;
+      // immediate win / block
+      for(const c of ms){ if(winner(drop(board,c,AI))===AI){ playAI(c); return; } }
+      for(const c of ms){ if(winner(drop(board,c,HUMAN))===HUMAN){ playAI(c); return; } }
+      const depth=clamp(query.depth??profile.aiConfig.depth,3,8);
+      const randomness=clamp(query.rand??profile.aiConfig.randomness,0,0.6);
+      const style=query.style??profile.aiConfig.style;
+      const scored=ms.map(col=>{
+        const child=drop(board,col,AI);
+        const {score}=minimax(child, Math.max(0,depth-1), false, style, profile.humanColumnFreq);
+        return {col,score:score-(profile.humanColumnFreq[col]||0)*1.8};
+      }).sort((a,b)=>b.score-a.score);
+      const pick = (Math.random()<randomness && scored.length>1)
+        ? scored[Math.min(2,Math.floor(Math.random()*Math.min(3,scored.length)))].col
+        : scored[0].col;
+      playAI(pick);
+    },140);
+    return ()=>clearTimeout(t);
+    // eslint-disable-next-line
+  },[turn,over,board,profile,query,screen]);
+
+  function playAI(col){
+    const nb=drop(board,col,AI); if(!nb) return;
+    setBoard(nb); setTurn(HUMAN);
+  }
+
+  // end of game handlers
   useEffect(()=>{
     if(screen==="menu"||!over) return;
     const res=(screen==="vsai")?(w===HUMAN?'W':w===AI?'L':'D'):(w===HUMAN?'W':'L');
     const p={...profile,lastTen:[...profile.lastTen,(res==='W'?'W':'L')].slice(-10)};
     const ns=updStats(stats,res);
     adapt(p,ns); saveProfile(p); saveStats(ns); setProfile(p); setStats(ns);
-    if(res==='W') confetti(1000);
+    if(res==='W') { confetti(1000); haptic(30); }
     setOverlay(w===3?'draw':(res==='W'?'win':'lose'));
-  // eslint-disable-next-line
+    // eslint-disable-next-line
   },[over,screen]);
 
-  function decide(b,p,q){
-    const ms=moves(b); if(!ms.length) return null;
-    for(const c of ms) if(winner(drop(b,c,AI))===AI) return c;
-    for(const c of ms) if(winner(drop(b,c,HUMAN))===HUMAN) return c;
-    const depth=clamp(q.depth??p.aiConfig.depth,3,8), randomness=clamp(q.rand??p.aiConfig.randomness,0,0.6), style=q.style??p.aiConfig.style;
-    const scored=ms.map(col=>{const child=drop(b,col,AI); const {score}=minimax(child,Math.max(0,depth-1),false,style,p.humanColumnFreq); return {col,score:score-(p.humanColumnFreq[col]||0)*2};}).sort((a,b)=>b.score-a.score);
-    if(Math.random()<randomness && scored.length>1){ const i=Math.min(2,Math.floor(Math.random()*Math.min(3,scored.length))); return scored[i].col; }
-    return scored[0].col;
-  }
-
+  // interactions
   function human(col){
     if(over) return;
     if(screen==="vsai" && turn!==HUMAN) return;
-    const player=(screen==="local"?(turn===HUMAN?HUMAN:AI):HUMAN);
+    const player=(screen==="local" ? (turn===HUMAN?HUMAN:AI) : HUMAN);
     const nb=drop(board,col,player); if(!nb) return;
-    setBoard(nb);
+    setBoard(nb); haptic(8);
     if(screen==="vsai"){ setTurn(AI); const p={...profile}; p.humanColumnFreq[col]=(p.humanColumnFreq[col]||0)+1; saveProfile(p); setProfile(p); }
     else { setTurn(turn===HUMAN?AI:HUMAN); }
   }
-
-  function reset(){ setBoard(empty()); setTurn(HUMAN); setOverlay(null); }
-  function resetAll(){ saveProfile(defProfile()); saveStats(defStats()); setProfile(defProfile()); setStats(defStats()); reset(); }
+  function newGame(){ setBoard(emptyBoard()); setTurn(HUMAN); setOverlay(null); }
+  function resetAll(){ saveProfile(defProfile()); saveStats(defStats()); setProfile(defProfile()); setStats(defStats()); newGame(); }
   function shareUrl(){ const u=new URL(location.href); u.searchParams.set("mm4","1"); u.searchParams.set("mode","streak"); u.searchParams.set("target",String(stats.bestStreak||1)); u.searchParams.set("depth",String(profile.aiConfig.depth)); u.searchParams.set("rand",String(profile.aiConfig.randomness)); u.searchParams.set("style",String(profile.aiConfig.style)); return u.toString(); }
-  async function share(){ const link=shareUrl(); if(navigator.share){ try{ await navigator.share({title:"MindMatch 4 — Challenge",text:`Beat my ${stats.bestStreak}-win streak!`,url:link}); return;}catch{} } await navigator.clipboard?.writeText(link); setToast("Challenge link copied!"); setTimeout(()=>setToast(null),1500); }
+  async function share(){ const link=shareUrl(); if(navigator.share){ try{ await navigator.share({title:"MindMatch 4 — Challenge",text:`Beat my ${stats.bestStreak}-win streak!`,url:link}); return;}catch{} } await navigator.clipboard?.writeText(link); setToast("Challenge link copied!"); setTimeout(()=>setToast(null),1400); }
 
-  /* ---------- screens ---------- */
+  // --- Screens
   if(screen==="menu"){
     return (
       <div ref={rootRef} style={ui.page}>
         <header className="mm4-header" style={ui.header}>
-          <img src="/logo-128.png" alt="MindMatch 4 logo" width="40" height="40" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
+          <img src="/logo-128.png" alt="MindMatch 4" width="40" height="40" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
+          <div style={{flex:1,textAlign:"center"}}>
+            <div style={ui.h1}>MindMatch 4</div>
+            <div style={ui.tagline}>Beat the adaptive AI.</div>
+          </div>
+          <div style={ui.rowRight}>
+            <select aria-label="Theme" value={theme} onChange={e=>setTheme(e.target.value)} style={ui.select}>
+              <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
+            </select>
+          </div>
         </header>
 
         <main style={ui.menuMain}>
-          <div style={ui.titleWrap}>
-            <h1 style={ui.h1}>MindMatch 4</h1>
-            <div style={ui.tagline}>Beat the adaptive AI.</div>
-          </div>
-
           <div style={ui.menuButtons}>
-            <button style={{...ui.btn,background:"#22c55e"}} onClick={()=>{setScreen("vsai"); reset();}}>Play vs AI</button>
-            <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setScreen("local"); reset();}}>Multiplayer (Local)</button>
-          </div>
-
-          <div style={ui.row}>
-            <label style={{...ui.muted,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
-              Theme
-              <select value={theme} onChange={e=>setTheme(e.target.value)} style={ui.select}>
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
-            </label>
+            <button style={{...ui.btn,background:"#22c55e"}} onClick={()=>{setScreen("vsai"); newGame();}}>Play vs AI</button>
+            <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setScreen("local"); newGame();}}>Multiplayer (Local)</button>
           </div>
 
           <section style={ui.help}>
@@ -249,37 +332,39 @@ export default function App(){
               <HowTo img="/howto-win-vertical.gif" text="Vertical — four stacked."/>
               <HowTo img="/howto-win-diagonal.gif" text="Diagonal — four in a slope."/>
             </div>
+            <ul style={ui.list}>
+              <li>Tap a column to drop your disc. Discs stack from the bottom.</li>
+              <li>First to connect four in a row (↔, ↕, ↗/↘) wins.</li>
+              <li>AI learns your habits and counters frequent columns.</li>
+            </ul>
           </section>
-
-          <div style={{...ui.menuFoot,marginTop:8}}>
-            <div style={{...ui.muted,fontSize:12}}>“Multiplayer (Local)” is hot‑seat on the same device. Online rooms (Firebase/WebRTC) can be added later.</div>
-          </div>
         </main>
       </div>
     );
   }
 
-  // Game
+  // --- Game screen
   return (
     <div ref={rootRef} style={ui.page}>
       <header className="mm4-header" style={ui.header}>
-        <img src="/logo-128.png" alt="MindMatch 4 logo" width="36" height="36" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
+        <img src="/logo-128.png" alt="MindMatch 4" width="36" height="36" style={{borderRadius:8}} onError={e=>e.currentTarget.style.display='none'}/>
         <div style={{textAlign:"center",flex:1}}>
           <div style={ui.h1Small}>MindMatch 4</div>
           <div style={ui.taglineSmall}>{screen==="vsai" ? "Beat the adaptive AI." : "Local hot‑seat: P1 vs P2"}</div>
         </div>
         <div style={ui.rowRight}>
-          <select value={theme} onChange={e=>setTheme(e.target.value)} style={ui.select}>
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
+          <select aria-label="Theme" value={theme} onChange={e=>setTheme(e.target.value)} style={ui.select}>
+            <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
           </select>
           <button style={{...ui.btn,background:"#ef4444"}} onClick={()=>{setScreen("menu");}}>Home</button>
         </div>
       </header>
 
       <div className="mm4-status" style={ui.status}>
-        <div style={{fontWeight:700}}>{status}</div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{display:"inline-block",width:12,height:12,borderRadius:99,background:turn===HUMAN?"var(--red)":"var(--yellow)"}}/>
+          <b>{status}</b>
+        </div>
         <div style={{...ui.muted,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
           {screen==="vsai" ? <>Depth <b>{profile.aiConfig.depth}</b> · RNG <b>{Math.round(profile.aiConfig.randomness*100)}%</b> · Style <b>{profile.aiConfig.style}</b> · </> : null}
           Rating <b>{stats.rating}</b> · Best Streak <b>{stats.bestStreak}</b>
@@ -287,14 +372,15 @@ export default function App(){
       </div>
 
       <main className="mm4-main" style={ui.main}>
+        {/* Board */}
         <section ref={boardPanelRef} style={ui.panel}>
           <div style={ui.boardWrap}>
-            <div style={ui.boardFrame}>
+            <div style={ui.boardFrame} role="grid" aria-label="Connect Four board">
               <div style={ui.boardGrid}>
                 {Array.from({length:COLS}).map((_,c)=>{
-                  const col=[...board.map(r=>r[c])].reverse();
+                  const col=[...board.map(r=>r[c])].reverse(); // bottom-up
                   return (
-                    <button key={c} style={ui.colBtn} onClick={()=>human(c)} title={`Drop in column ${c+1}`} disabled={!!winner(board)}>
+                    <button key={c} style={ui.colBtn} onClick={()=>human(c)} title={`Drop in column ${c+1}`} aria-label={`Drop in column ${c+1}`} disabled={!!winner(board)}>
                       {col.map((cell,i)=>(
                         <div key={i} style={ui.cell}>
                           <div style={{
@@ -311,13 +397,14 @@ export default function App(){
               <div style={ui.holes} aria-hidden="true"></div>
             </div>
           </div>
-          <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:8,flexWrap:"wrap"}}>
-            <button style={{...ui.btn,background:"#38bdf8"}} onClick={reset}>New Game</button>
+          <div style={ui.actions}>
+            <button style={{...ui.btn,background:"#38bdf8"}} onClick={newGame}>New Game</button>
             <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
             <button style={{...ui.btn,background:"#ef4444"}} onClick={resetAll}>Reset Profile</button>
           </div>
         </section>
 
+        {/* Stats */}
         <aside style={{...ui.panel,overflow:"auto"}}>
           <h3 style={{marginTop:0}}>Stats</h3>
           <div style={{fontSize:14,lineHeight:1.6}}>
@@ -353,7 +440,7 @@ export default function App(){
               {overlay==='win' ? "Nice! Try to push your streak." : overlay==='lose' ? "Go again—you’ll get it." : "Evenly matched!"}
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-              <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setOverlay(null); reset();}}>Play Again</button>
+              <button style={{...ui.btn,background:"#38bdf8"}} onClick={()=>{setOverlay(null); newGame();}}>Play Again</button>
               <button style={{...ui.btn,background:"#22c55e"}} onClick={share}>Share Challenge</button>
             </div>
           </div>
@@ -365,7 +452,7 @@ export default function App(){
   );
 }
 
-/* ---------- HowTo card ---------- */
+/* --- HowTo card --- */
 function HowTo({img,text}){
   const [ok,setOk]=useState(true);
   return (
@@ -379,54 +466,50 @@ function HowTo({img,text}){
   );
 }
 
-/* ---------- UI styles ---------- */
+/* --- Styles (inline for simplicity) --- */
 const ui={
   page:{minHeight:"100svh",background:"linear-gradient(180deg,var(--bg2),var(--bg))",color:"var(--ink)",overflow:"hidden"},
   header:{display:"flex",alignItems:"center",gap:12,padding:"10px 12px"},
-  h1:{margin:"0 0 6px",fontSize:32,fontWeight:900,textAlign:"center"},
-  h2:{margin:"14px 0 8px",fontSize:20},
-  tagline:{textAlign:"center",color:"var(--muted)"},
+  h1:{margin:0,fontSize:26,fontWeight:900,lineHeight:1.1},
+  h2:{margin:"6px 0 10px",fontSize:18},
+  tagline:{color:"var(--muted)",fontSize:13},
   h1Small:{fontSize:20,fontWeight:800,lineHeight:1},
   taglineSmall:{fontSize:12,color:"var(--muted)"},
-  row:{display:"flex",gap:8,alignItems:"center",justifyContent:"center",marginTop:14},
   rowRight:{display:"flex",gap:8,alignItems:"center"},
-  btn:{border:0,padding:"10px 14px",borderRadius:12,color:"#fff",fontWeight:700,cursor:"pointer"},
+  btn:{border:0,padding:"10px 14px",borderRadius:12,color:"#fff",fontWeight:700,cursor:"pointer",boxShadow:"var(--shadow)"},
   select:{border:"1px solid var(--panel-border)",background:"var(--panel)",color:"var(--ink)",borderRadius:10,padding:"8px 10px",fontWeight:600},
   muted:{color:"var(--muted)"},
-  menuMain:{display:"grid",gridTemplateRows:"auto auto auto 1fr",gap:12,height:"calc(100svh - 64px)",padding:"0 12px",overflow:"hidden"},
-  titleWrap:{marginTop:4},
-  menuButtons:{display:"flex",gap:10,justifyContent:"center",marginTop:8,flexWrap:"wrap"},
+  menuMain:{display:"grid",gridTemplateRows:"auto 1fr",gap:12,height:"calc(100svh - 62px)",padding:"0 12px",overflow:"hidden"},
+  menuButtons:{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"},
   help:{background:"var(--panel)",border:"1px solid var(--panel-border)",borderRadius:16,padding:12,overflow:"auto"},
   steps:{display:"grid",gridTemplateColumns:"1fr",gap:12},
-  step:{display:"grid",gridTemplateColumns:"160px 1fr",gap:12,alignItems:"center"},
-  stepMedia:{width:160,height:90,overflow:"hidden",borderRadius:10,border:"1px solid var(--panel-border)"},
+  step:{display:"grid",gridTemplateColumns:"150px 1fr",gap:12,alignItems:"center"},
+  stepMedia:{width:150,height:88,overflow:"hidden",borderRadius:10,border:"1px solid var(--panel-border)"},
   gif:{width:"100%",height:"100%",objectFit:"cover"},
   stepText:{fontSize:14},
-  menuFoot:{display:"grid",placeItems:"center"},
+  list:{margin:"10px 0 0",paddingLeft:18,fontSize:14,lineHeight:1.6},
   status:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 12px 6px"},
-  main:{maxWidth:1200,margin:"0 auto",padding:"0 12px",display:"grid",gridTemplateColumns:"1fr",gap:12,height:"calc(100svh - 136px)"},
-  panel:{background:"var(--panel)",border:"1px solid var(--panel-border)",borderRadius:16,padding:12,boxShadow:"0 10px 30px rgba(0,0,0,.12)",minHeight:0,overflow:"hidden"},
-  /* Board */
+  main:{maxWidth:1200,margin:"0 auto",padding:"0 12px",display:"grid",gridTemplateColumns:"1fr",gap:12,height:"calc(100svh - 134px)"},
+  panel:{background:"var(--panel)",border:"1px solid var(--panel-border)",borderRadius:16,padding:12,boxShadow:"var(--shadow)",minHeight:0,overflow:"hidden"},
   boardWrap:{display:"grid",placeItems:"center",height:"100%"},
   boardFrame:{position:"relative",borderRadius:16,padding:"calc(var(--gap)*.6)",background:"linear-gradient(180deg,#0b162b,#0a1222)",height:"100%",width:"fit-content",maxWidth:"100%"},
   boardGrid:{position:"relative",display:"grid",gridTemplateColumns:"repeat(7,var(--cell))",gap:"var(--gap)",padding:"var(--gap)",borderRadius:12,background:"var(--bg2)"},
   holes:{position:"absolute",inset:0,pointerEvents:"none",borderRadius:12,boxShadow:"inset 0 0 0 2px var(--grid), inset 0 6px 18px rgba(0,0,0,.35)"},
   colBtn:{display:"flex",flexDirection:"column",justifyContent:"flex-end",gap:"var(--gap)",background:"transparent",border:0,cursor:"pointer",padding:0},
   cell:{width:"var(--cell)",height:"var(--cell)",borderRadius:"50%",display:"grid",placeItems:"center",background:"radial-gradient(circle at 50% 50%, var(--hole) 62%, transparent 63%)",boxShadow:"inset 0 0 0 1px var(--grid)"},
-  disc:{width:"calc(var(--cell) - var(--disc-pad))",height:"calc(var(--cell) - var(--disc-pad))",borderRadius:"50%",transition:"transform .2s ease"},
-  /* Stats */
+  disc:{width:"calc(var(--cell) - var(--disc-pad))",height:"calc(var(--cell) - var(--disc-pad))",borderRadius:"50%",transition:"transform .18s ease"},
+  actions:{display:"flex",gap:8,justifyContent:"center",marginTop:8,flexWrap:"wrap"},
   bars:{display:"flex",gap:6,alignItems:"end"},
   bar:{flex:1},
-  barOuter:{height:64,background:"rgba(148,163,184,.35)",borderRadius:"6px 6px 0 0",overflow:"hidden",display:"flex",alignItems:"end"},
+  barOuter:{height:70,background:"rgba(148,163,184,.35)",borderRadius:"6px 6px 0 0",overflow:"hidden",display:"flex",alignItems:"end"},
   barInner:{width:"100%",background:"var(--green)"},
   input:{padding:"8px 10px",borderRadius:10,border:"1px solid var(--panel-border)",background:"var(--panel)",color:"var(--ink)",width:"100%"},
-  /* Overlay & toast */
   overlay:{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"grid",placeItems:"center",padding:16},
   card:{background:"var(--panel)",color:"var(--ink)",padding:18,borderRadius:16,border:"1px solid var(--panel-border)",width:"92%",maxWidth:460,textAlign:"center"},
   toast:{position:"fixed",bottom:16,left:"50%",transform:"translateX(-50%)",background:"var(--panel)",color:"var(--ink)",padding:"8px 12px",border:"1px solid var(--panel-border)",borderRadius:10}
 };
 
-// desktop layout
+// desktop layout rule once
 const styleEl=document.createElement("style");
 styleEl.textContent=`@media (min-width:900px){ .mm4-main{grid-template-columns:minmax(0,1fr) 320px;} .mm4-help-steps{grid-template-columns:repeat(3,1fr);} }`;
 document.head.appendChild(styleEl);
