@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
     <title>MindMatch 4 — Adaptive Connect Four | Smart Mind Game</title>
 
-    <!-- SEO + Social -->
+    <!-- SEO -->
     <meta name="description" content="MindMatch 4 is an adaptive Connect Four game. The AI learns your style and gets harder as you win. Play vs AI or local multiplayer." />
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
     <meta property="og:title" content="MindMatch 4 — Adaptive Connect Four" />
@@ -18,7 +18,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
 
-    <!-- Icons (must be in /public) -->
+    <!-- Icons from /public -->
     <link rel="icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="/logo-32.png" />
     <link rel="icon" type="image/png" sizes="64x64" href="/logo-64.png" />
@@ -53,13 +53,14 @@
         --hole:#0f172a; --grid:#1f2937;
       }
       html,body,#root{height:100%}
-      body{margin:0;background:linear-gradient(180deg,var(--bg2),var(--bg));color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";overflow:hidden}
+      body{margin:0;background:linear-gradient(180deg,var(--bg2),var(--bg));color:var(--ink);
+           font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
+           overflow:hidden}
       #mm4-confetti{position:fixed;inset:0;pointer-events:none;z-index:40}
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <!-- NOTE: entry is in /src now -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
