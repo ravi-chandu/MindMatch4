@@ -1,5 +1,5 @@
 name: Deploy MindMatch4 to GitHub Pages
-# adj
+
 on:
   push:
     branches: [ main ]
@@ -25,7 +25,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          # no cache since you don't keep a package-lock.json
+          # no cache (no lockfile committed)
 
       - name: Install deps
         run: npm install --no-audit --no-fund
