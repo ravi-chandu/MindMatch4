@@ -3,9 +3,6 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  base: "/MindMatch4/", 
-  build: {
-    outDir: "dist",
-    sourcemap: false
-  }
+  base: "/MindMatch4/",   
+  build: { outDir: "dist", sourcemap: false }
 });
