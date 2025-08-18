@@ -5,7 +5,7 @@ const ROWS = 6, COLS = 7;
 const emptyBoard = () => Array.from({length: COLS}, () => []);
 const clampCol = (c)=> Math.max(0, Math.min(COLS-1, c));
 
-/* Close-ness + comments */
+/* ---- closeness + comments ---- */
 function nearWinScore(board, player=1){
   const at = (r,c)=> (r<0||r>=ROWS||c<0||c>=COLS) ? -99 : ((board[c][ROWS-1-r] ?? 0));
   let score=0;
@@ -25,10 +25,10 @@ function nearWinScore(board, player=1){
 function engageMessage(outcome, {ms=0, near=0}={}){
   const quick = ms<45000, long = ms>180000;
   const close = near>=1, veryClose = near>=2;
+  const pick = (a)=> a[Math.floor(Math.random()*a.length)];
   const AI = [
     close ? "So close! I squeezed a line. Rematch? 😉" : "Gotcha 😏 — try again?",
-    veryClose ? "You nearly had me there. One different drop and it's yours."
-              : "Watch the diagonals. Hint helps in tight spots.",
+    veryClose ? "You nearly had me there. One different drop and it's yours." : "Watch diagonals. Hint helps in tight spots.",
     long ? "Epic grind! I found the last thread. Another round?" : "Bet you can’t beat me twice."
   ];
   const YOU = [
@@ -36,17 +36,13 @@ function engageMessage(outcome, {ms=0, near=0}={}){
     quick ? "Speedrun vibes. Again?" : "That patience paid off. One more?",
     "I’m dialing the difficulty up a notch…"
   ];
-  const DRAW = [
-    "Stalemate… rematch?",
-    close ? "Both had threats brewing. Let’s settle this." : "Even match! One more?"
-  ];
-  const pick = (arr)=> arr[Math.floor(Math.random()*arr.length)];
+  const DRAW = [ "Stalemate… rematch?", close ? "Both had threats brewing. Let’s settle this." : "Even match! One more?" ];
   if (outcome==="ai_win")     return pick(AI);
   if (outcome==="player_win") return pick(YOU);
   return pick(DRAW);
 }
 
-/* Lightweight confetti */
+/* ---- confetti ---- */
 function fireConfetti(canvas){
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -56,7 +52,7 @@ function fireConfetti(canvas){
   setTimeout(()=>{ clearInterval(id); ctx.clearRect(0,0,W,H); },1800);
 }
 
-/* Emoji grid for sharing */
+/* ---- share ---- */
 function shareText(board, outcome){
   const map = { "-1":"🔴", "1":"🟡", "0":"⚫" };
   let rows = [];
@@ -68,7 +64,7 @@ function shareText(board, outcome){
     }
     rows.push(line);
   }
-  const head = `MindMatch 4 — ${outcome==="player_win"?"I won":"AI won"}\n`;
+  const head = `MindMatch 4 — ${outcome==="player_win"?"I won":"They won"}\n`;
   const body = rows.join("\n");
   return `${head}${body}\nhttps://ravi-chandu.github.io/MindMatch4/`;
 }
@@ -103,7 +99,7 @@ function Home({onPlayAI,onPlay2P,onDaily}){
     <div className="card" style={{margin:"0 auto", maxWidth:520}}>
       <h2 style={{margin:"0 0 10px", textAlign:"center"}}>Welcome</h2>
       <p className="tiny" style={{textAlign:"center", margin:"0 0 10px"}}>
-        Connect <b>four</b> discs in a row (horizontal, vertical, diagonal). Tap a column to drop your disc. Use <b>Hint</b> when stuck.
+        Connect <b>four</b> discs in a row. Tap a column to drop your disc. Use <b>Hint</b> when stuck.
       </p>
       <div className="big-options">
         <button className="big-btn ai" onClick={onPlayAI}>Play vs AI</button>
@@ -113,7 +109,7 @@ function Home({onPlayAI,onPlay2P,onDaily}){
       <ul className="tiny" style={{margin:"8px 0 0", paddingLeft:"18px"}}>
         <li>Yellow = You, Red = AI</li>
         <li>AI adapts to your play. Winning increases its search depth.</li>
-        <li>Daily gives a fresh curated mid-game each day.</li>
+        <li>Daily gives a fresh curated mid‑game each day.</li>
       </ul>
     </div>
   );
@@ -121,19 +117,19 @@ function Home({onPlayAI,onPlay2P,onDaily}){
 
 function Game({mode, seedDaily, onBack}){
   const [board, setBoard] = useState(()=> emptyBoard());
-  const [turn, setTurn] = useState(1); // 1=You/P1, -1=AI/P2
-  const [end, setEnd] = useState(null); // "player_win" | "ai_win" | "draw" | null
+  const [turn, setTurn] = useState(1);                // 1=You/P1, -1=AI/P2
+  const [end, setEnd] = useState(null);               // "player_win" | "ai_win" | "draw" | null (keys used only for AI stats)
   const [winLine, setWinLine] = useState(null);
   const [talk, setTalk] = useState("");
 
   // stats (count only for AI games)
   const [stats, setStats] = useState(()=> JSON.parse(localStorage.getItem("mm4_stats")||`{"games":0,"wins":0,"losses":0,"draws":0,"streak":0}`));
-  const record = (outcome)=>{
-    if (mode!=="ai") return;  // only vs AI
+  const record = (outcomeKey)=>{
+    if (mode!=="ai") return; // only vs AI
     const s = {...stats};
     s.games++;
-    if (outcome==="player_win"){ s.wins++; s.streak = Math.max(1, s.streak+1); }
-    else if (outcome==="ai_win"){ s.losses++; s.streak = 0; }
+    if (outcomeKey==="player_win"){ s.wins++; s.streak = Math.max(1, s.streak+1); }
+    else if (outcomeKey==="ai_win"){ s.losses++; s.streak = 0; }
     else { s.draws++; }
     localStorage.setItem("mm4_stats", JSON.stringify(s));
     setStats(s);
@@ -151,7 +147,7 @@ function Game({mode, seedDaily, onBack}){
     // eslint-disable-next-line
   }, []);
 
-  // expose to AI adapter
+  // expose to AI adapter + Hint
   useEffect(()=>{
     window.board = board;
     window.turn = turn;
@@ -160,6 +156,18 @@ function Game({mode, seedDaily, onBack}){
     window.loadBoardState = (b) => { setBoard(b); setTurn(1); setEnd(null); setWinLine(null); setTalk(""); startRef.current = Date.now(); };
     window.renderBoard = (b) => setBoard(b);
     window.dropPiece = (col) => place(col, turn);
+
+    // let the coach play its move
+    window.applyMove = (col) => place(col, -1);
+
+    // highlight columns for Hint (briefly)
+    window.highlightCols = (cols=[])=>{
+      document.querySelectorAll('.hint-col').forEach(el=>el.classList.remove('hint-col'));
+      cols.forEach(c=>{
+        const el = document.querySelector(`.col[data-col="${c}"]`);
+        if (el){ el.classList.add('hint-col'); setTimeout(()=> el.classList.remove('hint-col'), 1600); }
+      });
+    };
   }, [board, turn, mode]);
 
   // first-time “drop here” pulse on center column
@@ -174,8 +182,11 @@ function Game({mode, seedDaily, onBack}){
     }
   }, []);
 
-  const msg = end
-    ? (end==="player_win"?"You win!":end==="ai_win"?"AI wins!":"Draw")
+  // UI message by mode
+  const statusText = end
+    ? (mode==="ai"
+        ? (end==="player_win" ? "You win!" : end==="ai_win" ? "AI wins!" : "Draw")
+        : (end==="player_win" ? "P1 wins!" : end==="ai_win" ? "P2 wins!" : "Draw"))
     : (turn===1 ? (mode==="ai"?"Your move (Yellow)":"P1 move (Yellow)") : (mode==="ai"?"AI is thinking…":"P2 move (Red)"));
 
   function place(col, who){
@@ -200,25 +211,27 @@ function Game({mode, seedDaily, onBack}){
     return true;
   }
 
-  function finish(outcome, line){
-    setEnd(outcome);
+  function finish(outcomeKey, line){
+    setEnd(outcomeKey);
     setWinLine(line);
 
     const ms = Date.now() - startRef.current;
     const near = nearWinScore(board, 1);
-    setTalk(engageMessage(outcome, {ms, near}));
+    setTalk(engageMessage(outcomeKey, {ms, near}));
 
-    // Confetti for both wins
+    // Confetti on both sides’ wins
     const canvas = document.getElementById("mm4-confetti");
-    if (canvas && (outcome==="player_win" || outcome==="ai_win")) fireConfetti(canvas);
+    if (canvas && (outcomeKey==="player_win" || outcomeKey==="ai_win")) fireConfetti(canvas);
 
-    // announce
+    // live region (accessibility)
     const announce = document.getElementById("announce");
-    if (announce) announce.textContent = `${msg} — ${talk}`;
+    if (announce) announce.textContent = `${statusText} — ${talk}`;
 
-    record(outcome);
-    window.dispatchEvent(new CustomEvent("mm4:gameend",{detail:{outcome}}));
-    if (window.MindMatchAI?.onGameEnd) window.MindMatchAI.onGameEnd(outcome);
+    // only record vs AI
+    record(outcomeKey);
+
+    window.dispatchEvent(new CustomEvent("mm4:gameend",{detail:{outcome:outcomeKey}}));
+    if (window.MindMatchAI?.onGameEnd) window.MindMatchAI.onGameEnd(outcomeKey);
     return true;
   }
 
@@ -227,8 +240,8 @@ function Game({mode, seedDaily, onBack}){
     startRef.current = Date.now();
   }
 
-  async function share(outcome){
-    const text = shareText(board, outcome);
+  async function share(){
+    const text = shareText(board, end);
     try{
       if (navigator.share) { await navigator.share({ text }); }
       else { await navigator.clipboard.writeText(text); alert("Result copied!"); }
@@ -237,7 +250,7 @@ function Game({mode, seedDaily, onBack}){
 
   return (
     <>
-      {/* Action bar above the board (Home / Reset / Hint)  — Daily removed from here */}
+      {/* Action bar above the board (Home / Reset / Hint) — NO Daily here */}
       <div className="modebar">
         <button onClick={onBack}>Home</button>
         <button onClick={reset}>Reset</button>
@@ -245,12 +258,10 @@ function Game({mode, seedDaily, onBack}){
       </div>
 
       <p className="tiny" role="status" aria-live="polite" style={{textAlign:"center", margin:"4px 0 6px"}}>
-        {msg}
+        {statusText}
       </p>
 
       <div className="board-wrap">
-        {/* Winning line highlight */}
-        {!!winLine && <WinOverlay line={winLine} />}
         <div className="board" role="grid" aria-label="Connect Four">
           {Array.from({length: COLS}).map((_, c) => (
             <div key={c} className="col" data-col={c} onClick={()=> (mode==="ai" ? (turn===1 && window.dropPiece(c)) : window.dropPiece(c))}>
@@ -267,28 +278,35 @@ function Game({mode, seedDaily, onBack}){
             </div>
           ))}
         </div>
+        {/* Winning line overlay ABOVE the board (z-indexed) */}
+        {!!winLine && <WinOverlay line={winLine} />}
       </div>
 
-      {/* Stats under the board (AI only) */}
+      {/* Stats under the board (AI only – but we still display the saved AI stats) */}
       <div className="stats">
         <div>📊 Games: <b>{stats.games}</b> · ✅ Wins: <b>{stats.wins}</b> · ❌ Losses: <b>{stats.losses}</b> · 🤝 Draws: <b>{stats.draws}</b> · 🔥 Streak: <b>{stats.streak}</b></div>
         <div style={{marginTop:"6px"}}>
           <button onClick={reset} style={{marginRight:8}}>Rematch</button>
-          <button onClick={()=>{ reset(); setTurn(-1); window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:-1}})); }}>AI starts</button>
+          {mode==="ai" && <button onClick={()=>{ reset(); setTurn(-1); window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:-1}})); }}>AI first move</button>}
           <button onClick={resetStats} style={{marginLeft:8}}>Reset stats</button>
         </div>
       </div>
 
-      {/* Result modal with comments + actions */}
+      {/* Result modal */}
       {end && (
         <div className="modal" role="dialog" aria-modal="true">
           <div className="dialog">
-            <h2>{end==="player_win"?"🎉 You win!":"ai_win"===end?"🤖 AI wins":"🤝 Draw"}</h2>
+            <h2>
+              {mode==="ai"
+                ? (end==="player_win"?"🎉 You win!":end==="ai_win"?"🤖 AI wins":"🤝 Draw")
+                : (end==="player_win"?"🟡 P1 wins!":end==="ai_win"?"🔴 P2 wins!":"🤝 Draw")}
+            </h2>
             <p style={{opacity:.9}}>{talk}</p>
             <div className="actions">
               <button onClick={reset}>Play again</button>
-              <button onClick={()=>share(end)}>Share</button>
-              {mode==="ai" && <button onClick={()=>{ reset(); setTurn(-1); window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:-1}})); }}>AI starts</button>}
+              <button onClick={share}>Share</button>
+              {mode==="ai" && <button onClick={()=>{ reset(); setTurn(-1); window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:-1}})); }}>AI first move</button>}
+              <button onClick={onBack}>Home</button>
             </div>
           </div>
         </div>
