@@ -76,8 +76,14 @@
       "author": {"@type":"Person","name":"Ravi Chandu"},
       "publisher": {"@type":"Person","name":"Ravi Chandu"}
       }
-</script>
+     </script>
 
+    <script>
+    if ("serviceWorker" in navigator) {
+     navigator.serviceWorker.register("/MindMatch4/sw.js");
+     }
+    </script>
+ 
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-E18C1B9SE4"></script>
 <script>
