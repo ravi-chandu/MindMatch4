@@ -1,0 +1,17 @@
+name: Lighthouse CI
+on:
+  schedule:
+    - cron: "30 3 * * *"   # 09:00 IST
+  workflow_dispatch:
+jobs:
+  lhci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit Live Site
+        uses: treosh/lighthouse-ci-action@v11
+        with:
+          urls: |
+            https://ravi-chandu.github.io/MindMatch4/
+          uploadArtifacts: true
+          temporaryPublicStorage: true
