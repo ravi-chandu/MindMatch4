@@ -1,4 +1,4 @@
-// ai/mm4-plugin-wire.js
+// ai/mm4-plugin-wire.js 
 import * as Engine from "./engine.js";
 import { aiMove, onGameEnd, computeHints } from "./coach.js";
 import { todaySeed } from "./challenge.js";
