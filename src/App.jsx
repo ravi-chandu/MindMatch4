@@ -5,14 +5,7 @@ const ROWS = 6, COLS = 7;
 const emptyBoard = () => Array.from({length: COLS}, () => []);
 const clampCol = (c)=> Math.max(0, Math.min(COLS-1, c));
 
-const COMMENTS = {
-  player_win: ["🎉 Brilliant! You outplayed the AI.", "😎 Nice fork! Try again?", "🔥 Clean finish!"],
-  ai_win:     ["🤖 Gotcha 😏 — try again?", "🧩 Watch those diagonals. Hint helps.", "🧠 I squeezed a line there. Rematch?"],
-  draw:       ["🤝 Stalemate… rematch?", "⚖️ Even match! One more?"]
-};
-const rand = (a)=> a[Math.floor(Math.random()*a.length)] || "";
-
-/* Heuristic "near win" score for the human at game end (counts open 3-in-a-rows) */
+/* Close-ness + comments */
 function nearWinScore(board, player=1){
   const at = (r,c)=> (r<0||r>=ROWS||c<0||c>=COLS) ? -99 : ((board[c][ROWS-1-r] ?? 0));
   let score=0;
@@ -29,30 +22,55 @@ function nearWinScore(board, player=1){
   }
   return score;
 }
-
-/* Dynamic engagement copy based on outcome + time + closeness */
-function engageMessage(outcome, {ms=0, moves=0, near=0}={}){
+function engageMessage(outcome, {ms=0, near=0}={}){
   const quick = ms<45000, long = ms>180000;
   const close = near>=1, veryClose = near>=2;
-
   const AI = [
     close ? "So close! I squeezed a line. Rematch? 😉" : "Gotcha 😏 — try again?",
-    veryClose ? "You nearly had me there. One different drop and it's yours." : "Watch the diagonals. Use Hint in tight spots.",
-    long ? "Epic battle! I found the last thread. Up for another?" : "Bet you can't beat me twice in a row."
+    veryClose ? "You nearly had me there. One different drop and it's yours."
+              : "Watch the diagonals. Hint helps in tight spots.",
+    long ? "Epic grind! I found the last thread. Another round?" : "Bet you can’t beat me twice."
   ];
   const YOU = [
     veryClose ? "Brilliant clutch! 🎉" : "Nice finish! 🔥",
-    quick ? "Speedrun vibes. Again?" : "That patience paid off. Another round?",
-    "I'm dialing the difficulty up a notch…"
+    quick ? "Speedrun vibes. Again?" : "That patience paid off. One more?",
+    "I’m dialing the difficulty up a notch…"
   ];
   const DRAW = [
     "Stalemate… rematch?",
-    close ? "Both had threats brewing. Let's settle this." : "Even match! One more?"
+    close ? "Both had threats brewing. Let’s settle this." : "Even match! One more?"
   ];
+  const pick = (arr)=> arr[Math.floor(Math.random()*arr.length)];
+  if (outcome==="ai_win")     return pick(AI);
+  if (outcome==="player_win") return pick(YOU);
+  return pick(DRAW);
+}
 
-  if (outcome==="ai_win")     return AI[Math.floor(Math.random()*AI.length)];
-  if (outcome==="player_win") return YOU[Math.floor(Math.random()*YOU.length)];
-  return DRAW[Math.floor(Math.random()*DRAW.length)];
+/* Lightweight confetti */
+function fireConfetti(canvas){
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width = innerWidth, H = canvas.height = innerHeight;
+  const parts = Array.from({length: 140}, ()=>({ x: Math.random()*W, y: -20 - Math.random()*H/3, s: 4+Math.random()*6, v: 2+Math.random()*4, a: Math.random()*Math.PI }));
+  let t = 0; const id = setInterval(()=>{ ctx.clearRect(0,0,W,H); parts.forEach(p=>{ p.y += p.v; p.x += Math.sin((t+p.a))*1.5; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((t+p.a)*0.2); ctx.fillStyle = ["#ef4444","#f59e0b","#10b981","#3b82f6","#a855f7"][p.s|0 % 5]; ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s); ctx.restore(); }); t+=0.03; },16);
+  setTimeout(()=>{ clearInterval(id); ctx.clearRect(0,0,W,H); },1800);
+}
+
+/* Emoji grid for sharing */
+function shareText(board, outcome){
+  const map = { "-1":"🔴", "1":"🟡", "0":"⚫" };
+  let rows = [];
+  for (let r=0;r<ROWS;r++){
+    let line = "";
+    for (let c=0;c<COLS;c++){
+      const v = (board[c][ROWS-1-r] ?? 0);
+      line += map[String(v)];
+    }
+    rows.push(line);
+  }
+  const head = `MindMatch 4 — ${outcome==="player_win"?"I won":"AI won"}\n`;
+  const body = rows.join("\n");
+  return `${head}${body}\nhttps://ravi-chandu.github.io/MindMatch4/`;
 }
 
 export default function App(){
@@ -60,7 +78,6 @@ export default function App(){
   const [mode, setMode] = useState("ai");       // ai | 2p
   const [seedDaily, setSeedDaily] = useState(false);
 
-  // simple navigation from header title
   useEffect(()=>{
     const h = (e)=> setScreen(e.detail?.to || "home");
     addEventListener("mm4:navigate", h);
@@ -86,16 +103,13 @@ function Home({onPlayAI,onPlay2P,onDaily}){
     <div className="card" style={{margin:"0 auto", maxWidth:520}}>
       <h2 style={{margin:"0 0 10px", textAlign:"center"}}>Welcome</h2>
       <p className="tiny" style={{textAlign:"center", margin:"0 0 10px"}}>
-        Connect <b>four</b> of your discs in a row — horizontally, vertically, or diagonally.
-        Tap a column to drop your disc. Use <b>Hint</b> when stuck.
+        Connect <b>four</b> discs in a row (horizontal, vertical, diagonal). Tap a column to drop your disc. Use <b>Hint</b> when stuck.
       </p>
-
       <div className="big-options">
         <button className="big-btn ai" onClick={onPlayAI}>Play vs AI</button>
         <button className="big-btn p2" onClick={onPlay2P}>Local Multiplayer</button>
         <button className="big-btn daily" onClick={onDaily}>Daily Puzzle</button>
       </div>
-
       <ul className="tiny" style={{margin:"8px 0 0", paddingLeft:"18px"}}>
         <li>Yellow = You, Red = AI</li>
         <li>AI adapts to your play. Winning increases its search depth.</li>
@@ -110,14 +124,12 @@ function Game({mode, seedDaily, onBack}){
   const [turn, setTurn] = useState(1); // 1=You/P1, -1=AI/P2
   const [end, setEnd] = useState(null); // "player_win" | "ai_win" | "draw" | null
   const [winLine, setWinLine] = useState(null);
+  const [talk, setTalk] = useState("");
 
-  // timers + counters for engagement copy
-  const startRef = useRef(Date.now());
-  const movesRef = useRef(0);
-
-  // Stats (localStorage) inline under board
+  // stats (count only for AI games)
   const [stats, setStats] = useState(()=> JSON.parse(localStorage.getItem("mm4_stats")||`{"games":0,"wins":0,"losses":0,"draws":0,"streak":0}`));
   const record = (outcome)=>{
+    if (mode!=="ai") return;  // only vs AI
     const s = {...stats};
     s.games++;
     if (outcome==="player_win"){ s.wins++; s.streak = Math.max(1, s.streak+1); }
@@ -128,7 +140,10 @@ function Game({mode, seedDaily, onBack}){
   };
   const resetStats = ()=>{ const s={games:0,wins:0,losses:0,draws:0,streak:0}; localStorage.setItem("mm4_stats", JSON.stringify(s)); setStats(s); };
 
-  // seed daily board once
+  // timers for engagement copy
+  const startRef = useRef(Date.now());
+
+  // seed daily
   useEffect(()=>{
     if (seedDaily && window.MindMatchAI?.todaySeed){
       setBoard(window.MindMatchAI.todaySeed());
@@ -136,18 +151,18 @@ function Game({mode, seedDaily, onBack}){
     // eslint-disable-next-line
   }, []);
 
-  // expose to window for adapter/AI
+  // expose to AI adapter
   useEffect(()=>{
     window.board = board;
     window.turn = turn;
     window.mm4Mode = mode;
     window.getBoardState = () => board;
-    window.loadBoardState = (b) => { setBoard(b); setTurn(1); setEnd(null); setWinLine(null); startRef.current = Date.now(); movesRef.current = 0; };
+    window.loadBoardState = (b) => { setBoard(b); setTurn(1); setEnd(null); setWinLine(null); setTalk(""); startRef.current = Date.now(); };
     window.renderBoard = (b) => setBoard(b);
     window.dropPiece = (col) => place(col, turn);
   }, [board, turn, mode]);
 
-  // first-time guided “drop here” pulse on center column
+  // first-time “drop here” pulse on center column
   useEffect(()=>{
     const key = "mm4_seen_onboarding";
     if (localStorage.getItem(key)) return;
@@ -167,8 +182,6 @@ function Game({mode, seedDaily, onBack}){
     if (end) return false;
     const c = clampCol(col);
     if ((board[c]?.length||0) >= ROWS) return false;
-
-    movesRef.current += 1;
 
     const nb = board.map(x=>x.slice());
     nb[c] = (nb[c]||[]).concat(who);
@@ -193,13 +206,13 @@ function Game({mode, seedDaily, onBack}){
 
     const ms = Date.now() - startRef.current;
     const near = nearWinScore(board, 1);
-    const talk = engageMessage(outcome, {ms, moves: movesRef.current, near});
+    setTalk(engageMessage(outcome, {ms, near}));
 
-    // Confetti for both wins (lighter but celebratory)
+    // Confetti for both wins
     const canvas = document.getElementById("mm4-confetti");
     if (canvas && (outcome==="player_win" || outcome==="ai_win")) fireConfetti(canvas);
 
-    // Update the live region with richer copy
+    // announce
     const announce = document.getElementById("announce");
     if (announce) announce.textContent = `${msg} — ${talk}`;
 
@@ -210,18 +223,25 @@ function Game({mode, seedDaily, onBack}){
   }
 
   function reset(){
-    setBoard(emptyBoard()); setTurn(1); setEnd(null); setWinLine(null);
-    startRef.current = Date.now(); movesRef.current = 0;
+    setBoard(emptyBoard()); setTurn(1); setEnd(null); setWinLine(null); setTalk("");
+    startRef.current = Date.now();
+  }
+
+  async function share(outcome){
+    const text = shareText(board, outcome);
+    try{
+      if (navigator.share) { await navigator.share({ text }); }
+      else { await navigator.clipboard.writeText(text); alert("Result copied!"); }
+    }catch{}
   }
 
   return (
     <>
-      {/* Action bar above the board (Home / Reset / Hint / Daily) */}
+      {/* Action bar above the board (Home / Reset / Hint)  — Daily removed from here */}
       <div className="modebar">
         <button onClick={onBack}>Home</button>
         <button onClick={reset}>Reset</button>
         {mode==="ai" && <button id="btnHint">Hint</button>}
-        {mode==="ai" && <button id="btnDaily">Daily Puzzle</button>}
       </div>
 
       <p className="tiny" role="status" aria-live="polite" style={{textAlign:"center", margin:"4px 0 6px"}}>
@@ -229,6 +249,7 @@ function Game({mode, seedDaily, onBack}){
       </p>
 
       <div className="board-wrap">
+        {/* Winning line highlight */}
         {!!winLine && <WinOverlay line={winLine} />}
         <div className="board" role="grid" aria-label="Connect Four">
           {Array.from({length: COLS}).map((_, c) => (
@@ -248,7 +269,7 @@ function Game({mode, seedDaily, onBack}){
         </div>
       </div>
 
-      {/* Stats under the board */}
+      {/* Stats under the board (AI only) */}
       <div className="stats">
         <div>📊 Games: <b>{stats.games}</b> · ✅ Wins: <b>{stats.wins}</b> · ❌ Losses: <b>{stats.losses}</b> · 🤝 Draws: <b>{stats.draws}</b> · 🔥 Streak: <b>{stats.streak}</b></div>
         <div style={{marginTop:"6px"}}>
@@ -257,32 +278,39 @@ function Game({mode, seedDaily, onBack}){
           <button onClick={resetStats} style={{marginLeft:8}}>Reset stats</button>
         </div>
       </div>
+
+      {/* Result modal with comments + actions */}
+      {end && (
+        <div className="modal" role="dialog" aria-modal="true">
+          <div className="dialog">
+            <h2>{end==="player_win"?"🎉 You win!":"ai_win"===end?"🤖 AI wins":"🤝 Draw"}</h2>
+            <p style={{opacity:.9}}>{talk}</p>
+            <div className="actions">
+              <button onClick={reset}>Play again</button>
+              <button onClick={()=>share(end)}>Share</button>
+              {mode==="ai" && <button onClick={()=>{ reset(); setTurn(-1); window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:-1}})); }}>AI starts</button>}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
 function WinOverlay({line}){
-  // line = [{r,c}...], r=0..5 (top->bottom DOM), c=0..6 (left->right)
+  // line = [{r,c}...], r=0..5 top->bottom, c=0..6 left->right
   const gap = 10;
   const cell = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--cell")) || 56;
   const pad=8;
   const x = (c)=> pad + c*(cell+gap) + cell/2;
   const y = (r)=> pad + r*(cell+gap) + cell/2;
-  const [a,, ,d] = line.map(p=>({X:x(p.c), Y:y(p.r)}));
+  const first = {X:x(line[0].c), Y:y(line[0].r)};
+  const last  = {X:x(line[3].c), Y:y(line[3].r)};
   return (
     <div className="win-overlay" aria-hidden="true">
       <svg>
-        <line x1={a.X} y1={a.Y} x2={d.X} y2={d.Y} stroke="gold" strokeWidth="6" strokeLinecap="round" />
+        <line x1={first.X} y1={first.Y} x2={last.X} y2={last.Y} stroke="gold" strokeWidth="6" strokeLinecap="round" />
       </svg>
     </div>
   );
-}
-
-/* Lightweight confetti */
-function fireConfetti(canvas){
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width = innerWidth, H = canvas.height = innerHeight;
-  const parts = Array.from({length: 140}, ()=>({ x: Math.random()*W, y: -20 - Math.random()*H/3, s: 4+Math.random()*6, v: 2+Math.random()*4, a: Math.random()*Math.PI }));
-  let t = 0; const id = setInterval(()=>{ ctx.clearRect(0,0,W,H); parts.forEach(p=>{ p.y += p.v; p.x += Math.sin((t+p.a))*1.5; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((t+p.a)*0.2); ctx.fillStyle = ["#ef4444","#f59e0b","#10b981","#3b82f6","#a855f7"][p.s|0 % 5]; ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s); ctx.restore(); }); t+=0.03; },16);
-  setTimeout(()=>{ clearInterval(id); ctx.clearRect(0,0,W,H); },1800);
 }
