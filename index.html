@@ -86,22 +86,40 @@
       gtag('config', 'G-E18C1B9SE4');
     </script>
 
-    <!-- Responsive cell sizing: fit 7x6 inside viewport -->
     <script>
-      function fitCell(){
-        const vw = Math.max(document.documentElement.clientWidth,  window.innerWidth  || 0);
-        const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
-        const toolbar = document.querySelector('.toolbar')?.offsetHeight || 0;
-        const padding = 40; // side padding reserve
-        const cellW = (vw - padding) / 7;
-        const cellH = (vh - (toolbar + 200)) / 6; // headroom for header/UI
-        const size = Math.max(34, Math.min(100, Math.floor(Math.min(cellW, cellH))));
-        document.documentElement.style.setProperty('--cell', size + 'px');
-      }
-      addEventListener('resize', fitCell);
-      addEventListener('orientationchange', fitCell);
-      addEventListener('DOMContentLoaded', fitCell);
-    </script>
+  // Fit 7x6 into the visible shell width/height, accounting for padding & gaps.
+  function fitCell(){
+    const shell = document.querySelector('.mm4-shell');
+    const boardPadding = 16;           // .board { padding: 8px } on each side → total 16
+    const shellSidePad = 24;           // .mm4-shell left+right padding total (~12px each)
+    const gap = 10;                    // --gap in CSS (keep in sync)
+    const toolbarH = document.querySelector('.toolbar')?.offsetHeight || 0;
+
+    const shellW = shell ? shell.getBoundingClientRect().width : window.innerWidth;
+    const availW = shellW - shellSidePad - (boardPadding * 2);    // inner width for the grid
+    const availH = window.innerHeight - (toolbarH + 180);         // leave room for header/status
+
+    // Width formula: 7*cell + 6*gap <= availW
+    const cellFromW = Math.floor((availW - gap * 6) / 7);
+    // Height formula: 6*cell + 5*gap <= availH
+    const cellFromH = Math.floor((availH - gap * 5) / 6);
+
+    // Pick the smaller; clamp to sane range
+    const size = Math.max(30, Math.min(96, Math.min(cellFromW, cellFromH)));
+
+    document.documentElement.style.setProperty('--gap', gap + 'px');
+    document.documentElement.style.setProperty('--cell', size + 'px');
+
+    // If even at min size the board would still overflow, enable horizontal scroll.
+    const needsScroll = (7*size + 6*gap + boardPadding*2) > (shellW - shellSidePad + 1);
+    shell?.classList.toggle('mm4-scroll-x', needsScroll);
+  }
+
+  addEventListener('resize', fitCell);
+  addEventListener('orientationchange', fitCell);
+  addEventListener('DOMContentLoaded', fitCell);
+</script>
+
   </head>
 
   <body>
