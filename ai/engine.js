@@ -1,7 +1,7 @@
 // ai/engine.js
 // Connect Four engine: negamax + alpha-beta + transposition + iterative deepening
 // 0=empty, 1=player (Yellow), -1=AI (Red).
-
+ 
 export const ROWS = 6, COLS = 7;
 export const ORDER = [3,2,4,1,5,0,6];
 const TT = new Map(); // transposition table
