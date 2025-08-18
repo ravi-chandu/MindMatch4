@@ -105,7 +105,7 @@
     const cellFromH = Math.floor((availH - gap * 5) / 6);
 
     // Pick the smaller; clamp to sane range
-    const size = Math.max(30, Math.min(96, Math.min(cellFromW, cellFromH)));
+    const size = Math.max(28, Math.min(96, Math.min(cellFromW, cellFromH)));
 
     document.documentElement.style.setProperty('--gap', gap + 'px');
     document.documentElement.style.setProperty('--cell', size + 'px');
