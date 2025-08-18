@@ -1,5 +1,11 @@
-.app{ width: 100%; max-width: min(calc(7 * var(--cell) + 6 * var(--gap) + 32px), 100vw); }
+/* Shell & header styles are in index.html (inline for faster paint). This file focuses on app-specific parts. */
 
+.app{
+  width: 100%;
+  max-width: min(calc(7 * var(--cell) + 6 * var(--gap) + 32px), 100vw);
+}
+
+/* Top bar (in App Home/Game) */
 .topbar{
   display:flex; align-items:center; justify-content:space-between;
   padding: 8px 4px; color: var(--ink);
@@ -7,14 +13,13 @@
 .brand{ font-size: 1.15rem; margin: 0 8px }
 .sub{ color: var(--muted); font-size:.9rem; margin:0 8px }
 
-.modebar{ display:flex; gap:8px; }
+.modebar{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:8px 0 10px; }
 .modebar button{
-  padding:6px 10px; border-radius:8px; border:1px solid var(--grid);
-  background:var(--bg2); color:var(--ink); cursor:pointer;
+  padding:8px 12px; border-radius:10px; border:1px solid var(--grid);
+  background:var(--bg2); color: var(--ink); cursor: pointer;
 }
-.modebar .active{ outline: 2px solid var(--green) }
 
-.status { text-align:center; margin: 6px 0 10px; color: var(--muted); }
+.status{ text-align:center; margin: 6px 0 10px; color: var(--muted); }
 
 .board-wrap{ position:relative; margin: 0 auto; }
 .board{
@@ -26,14 +31,9 @@
   border: 1px solid var(--panel-border);
   border-radius: 14px;
   box-shadow: var(--shadow);
-  width: calc(7 * var(--cell) + 6 * var(--gap));
+  width: min(calc(7 * var(--cell) + 6 * var(--gap)), calc(100vw - 24px));
+  max-width: 100%;
 }
-
-/* overlay line to show the winning 4 */
-.win-overlay{
-  pointer-events:none; position:absolute; inset:8px; /* match board padding */
-}
-.win-overlay svg{ width:100%; height:100%; }
 
 .col{
   display: grid;
@@ -61,25 +61,25 @@
 .disc.yellow{ background: radial-gradient(circle at 32% 28%, #ffe9a8, #fbbf24); border: 2px solid #d1a200; }
 .disc.red{    background: radial-gradient(circle at 32% 28%, #ff8a8a, #ef4444); border: 2px solid #b91c1c; }
 
-/* dialogs */
-.modal{
-  position: fixed; inset: 0; z-index: 70;
-  display:flex; align-items:center; justify-content:center;
-  background: rgba(0,0,0,.4);
-}
-.dialog{
-  background: var(--panel); border: 1px solid var(--panel-border);
-  border-radius: 14px; padding: 16px; width: min(92vw, 420px);
-  color: var(--ink); box-shadow: var(--shadow);
-}
-.dialog h2{ margin: 0 0 8px; }
-.dialog .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px }
-.dialog button{ padding:8px 12px; border-radius:10px; border:1px solid var(--grid); background:var(--bg2); color:var(--ink); cursor:pointer }
+/* Winner overlay area is defined in index.html */
 
-/* home & pages */
-.home{ display:grid; gap:12px; padding:12px; max-width:480px; margin:0 auto; }
+/* Cards on Home */
 .card{
   background: var(--panel); border:1px solid var(--panel-border);
-  border-radius:12px; padding:12px; box-shadow: var(--shadow);
+  border-radius:12px; padding:14px; box-shadow: var(--shadow);
 }
-.card h3{ margin: 0 0 6px }
+.big-options{ display:grid; gap:12px; margin: 10px 0; }
+.big-btn{
+  padding:16px; border-radius:14px; border:1px solid var(--grid);
+  background:var(--bg2); color:var(--ink); cursor:pointer; font-size:1.05rem; font-weight:600;
+}
+.big-btn.ai{    border-color: #3b82f6 }
+.big-btn.p2{    border-color: #16a34a }
+.big-btn.daily{ border-color: #7c3aed }
+
+/* Stats under board */
+.stats{ margin: 10px auto; text-align:center; color: var(--muted) }
+
+/* First-time guided move pulse */
+@keyframes mm4Pulse { 0%{box-shadow:0 0 0 0 rgba(59,130,246,.45)} 70%{box-shadow:0 0 0 18px rgba(59,130,246,0)} 100%{box-shadow:0 0 0 0 rgba(59,130,246,0)} }
+.onboard-pulse { outline: 3px solid #3b82f6; outline-offset: 2px; animation: mm4Pulse 1.2s ease-out 2; border-radius:12px; }
