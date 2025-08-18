@@ -1,4 +1,3 @@
-// ai/mm4-plugin-wire.js
 import * as Engine from "./engine.js";
 import { aiMove, onGameEnd, computeHints } from "./coach.js";
 import { todaySeed } from "./challenge.js";
@@ -22,30 +21,28 @@ function aiTurn(){
     window.dispatchEvent(new CustomEvent("mm4:aimove",{detail:{col:move}}));
   }
   const o = outcome();
-  if (o){ onGameEnd(o); const an = document.getElementById("announce"); if (an) an.textContent = o.replace("_"," "); }
+  if (o){ onGameEnd(o); }
   else { window.turn = 1; window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:1}})); }
 }
 
 window.addEventListener("DOMContentLoaded", () => {
   const btnHint = document.getElementById("btnHint");
   const btnDaily = document.getElementById("btnDaily");
-  const btnHome  = document.getElementById("btnHome");
+  const announcer = document.getElementById("announce");
 
   if (btnHint){
     btnHint.addEventListener("click", () => {
       const st = window.getBoardState?.();
       const h = computeHints(st, 1);
       window.highlightCols?.(h.best);
-      const an = document.getElementById("announce");
-      if (an) an.textContent = h.note + " (" + h.best.join(",") + ")";
+      if (announcer) announcer.textContent = h.note + " ("+h.best.join(",")+")";
       window.dispatchEvent(new CustomEvent("mm4:hint",{detail:h}));
     });
   }
   if (btnDaily){
     btnDaily.addEventListener("click", () => {
       window.loadBoardState?.(todaySeed());
-      const an = document.getElementById("announce");
-      if (an) an.textContent = "Daily puzzle loaded.";
+      if (announcer) announcer.textContent = "Daily puzzle loaded.";
       window.dispatchEvent(new Event("mm4:daily"));
       window.turn = 1;
     });
