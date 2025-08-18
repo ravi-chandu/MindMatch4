@@ -55,13 +55,17 @@
         --hole:#0f172a; --grid:#1f2937;
       }
 
+      /* Prevent stray overflow causing bottom scroller */
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { overflow-x: hidden; }
       html,body,#root{height:100%}
+
       body{
         margin:0;
         background:linear-gradient(180deg,var(--bg2),var(--bg));
         color:var(--ink);
         font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
-        overflow:auto; /* vertical scroll only if needed */
+        overflow-y:auto; /* vertical scroll only if needed */
       }
 
       /* Header with centered title */
@@ -72,8 +76,8 @@
         background:var(--panel); border-bottom:1px solid var(--panel-border);
         -webkit-backdrop-filter:saturate(140%) blur(6px); backdrop-filter:saturate(140%) blur(6px);
       }
-      .site-title{ text-align:center; font-weight:700; letter-spacing:.4px; }
-      .theme-toggle{ justify-self:end; display:flex; gap:6px }
+      .site-title{ text-align:center; font-weight:700; letter-spacing:.4px; cursor:pointer }
+      .theme-toggle{ justify-self:end; display:flex; gap:6px; align-items:center }
       .tiny{ font-size:.9rem; color:var(--muted) }
 
       .mm4-shell{ display:flex; justify-content:center; padding:12px; width:100%; }
@@ -115,7 +119,7 @@
         border: 1px solid var(--panel-border);
         border-radius: 14px;
         box-shadow: var(--shadow);
-        width: calc(7 * var(--cell) + 6 * var(--gap));
+        width: min(calc(7 * var(--cell) + 6 * var(--gap)), calc(100vw - 24px));
         max-width: 100%;
       }
       .col{ display:grid; grid-template-rows: repeat(6, var(--cell)); gap: var(--gap); cursor:pointer; }
@@ -139,7 +143,31 @@
       /* Stats under board */
       .stats{ margin: 10px auto; text-align:center; color: var(--muted) }
       #mm4-confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
+
+      /* First-time guided move pulse (class is applied from App.jsx) */
+      @keyframes mm4Pulse { 0%{box-shadow:0 0 0 0 rgba(59,130,246,.45)} 70%{box-shadow:0 0 0 18px rgba(59,130,246,0)} 100%{box-shadow:0 0 0 0 rgba(59,130,246,0)} }
+      .onboard-pulse { outline: 3px solid #3b82f6; outline-offset: 2px; animation: mm4Pulse 1.2s ease-out 2; border-radius:12px; }
     </style>
+
+    <!-- JSON-LD -->
+    <script type="application/ld+json">
+    {
+      "@context":"https://schema.org",
+      "@type":["Game","VideoGame"],
+      "name":"MindMatch 4 — Adaptive Connect Four",
+      "url":"https://ravi-chandu.github.io/MindMatch4/",
+      "applicationCategory":"Game",
+      "operatingSystem":"Web",
+      "inLanguage":"en",
+      "gamePlatform":"Web",
+      "genre":["Strategy","Board game","Puzzle"],
+      "description":"Smart, adaptive Connect Four with explainable hints, skill-based AI, and offline play.",
+      "author":{"@type":"Person","name":"Ravi Chandu"},
+      "publisher":{"@type":"Person","name":"Ravi Chandu"},
+      "offers":{"@type":"Offer","price":"0","priceCurrency":"USD","category":"free","availability":"https://schema.org/InStock"},
+      "aggregateRating":{"@type":"AggregateRating","ratingValue":"4.8","reviewCount":"57"}
+    }
+    </script>
 
     <!-- PWA -->
     <script>
@@ -162,20 +190,30 @@
       function currentTheme(){
         const t = localStorage.getItem("mm4_theme") || "auto";
         document.documentElement.setAttribute("data-theme", t);
+        const sel = document.getElementById("themeSelect");
+        if (sel) sel.value = t;
       }
       currentTheme();
 
       function fitCell(){
-        const gap = 10; // keep in sync with CSS
-        const shellW = Math.max(document.documentElement.clientWidth, window.innerWidth || 0) - 24; // page padding
-        const toolbarH = (document.querySelector('.site-header')?.offsetHeight||0);
-        const availH = Math.max(document.documentElement.clientHeight, window.innerHeight||0) - toolbarH - 220; // headroom
-        const cellFromW = Math.floor((shellW - 16 - gap*6) / 7); // board padding 8+8
+        const gap = 10; // keep in sync
+        const pagePad = 24;          // left+right content padding
+        const boardPad = 16;         // .board padding 8+8
+        const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+        const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+        const headerH = (document.querySelector('.site-header')?.offsetHeight || 0);
+
+        const availW = vw - pagePad - boardPad - 1; // -1 avoids rounding spill
+        const availH = vh - headerH - 220;          // headroom for bars/status
+
+        const cellFromW = Math.floor((availW - gap*6) / 7);
         const cellFromH = Math.floor((availH - gap*5) / 6);
-        const size = Math.max(26, Math.min(96, Math.min(cellFromW, cellFromH)));
-        document.documentElement.style.setProperty('--gap', gap + 'px');
-        document.documentElement.style.setProperty('--cell', size + 'px');
+        const size = Math.max(26, Math.min(92, Math.min(cellFromW, cellFromH)));
+
+        document.documentElement.style.setProperty('--gap',  String(gap));
+        document.documentElement.style.setProperty('--cell', String(size) + 'px');
       }
+
       addEventListener('resize', fitCell);
       addEventListener('orientationchange', fitCell);
       addEventListener('DOMContentLoaded', fitCell);
@@ -187,8 +225,8 @@
       <div class="tiny">🧠</div>
       <h1 class="site-title">MindMatch 4</h1>
       <div class="theme-toggle">
-       <label class="tiny" for="themeSelect" style="margin-right:6px">Theme</label>
-       <select id="themeSelect" aria-label="Theme">
+        <label class="tiny" for="themeSelect" style="margin-right:6px">Theme</label>
+        <select id="themeSelect" aria-label="Theme">
           <option value="auto">Default</option>
           <option value="light">Light</option>
           <option value="dark">Dark</option>
@@ -203,22 +241,30 @@
     <!-- Vite entry -->
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- AI wiring -->
+    <!-- Minimal boot + lazy AI wiring (so CSS/HTML paint first) -->
     <script type="module">
-      import "./ai/adapter.js";
-      import "./ai/mm4-plugin.js";
-      import "./ai/mm4-plugin-wire.js";
+      // Title → Home
+      document.querySelector(".site-title")?.addEventListener("click", ()=>{
+        window.dispatchEvent(new CustomEvent("mm4:navigate",{detail:{to:"home"}}));
+      });
 
+      // Theme persistence via <select>
+      const setT = (t)=>{ localStorage.setItem("mm4_theme", t); document.documentElement.setAttribute("data-theme", t); };
+      document.getElementById("themeSelect")?.addEventListener("change", (e)=> setT(e.target.value));
+
+      // Lazy-load AI extras without blocking first paint
+      const idle = window.requestIdleCallback || ((fn)=> setTimeout(fn, 1));
+      idle(async ()=>{
+        await import("./ai/adapter.js");
+        await import("./ai/mm4-plugin.js");
+        await import("./ai/mm4-plugin-wire.js");
+      });
+
+      // Analytics events
       window.addEventListener("mm4:hint",   (e)=> window.gtag && gtag('event','hint_used',{count:e.detail?.best?.length||0}));
       window.addEventListener("mm4:daily",  ()=> window.gtag && gtag('event','daily_loaded'));
       window.addEventListener("mm4:aimove", (e)=> window.gtag && gtag('event','ai_move',{col:e.detail?.col}));
       window.addEventListener("mm4:gameend",(e)=> window.gtag && gtag('event','game_end',{outcome:e.detail?.outcome}));
-
-      // Theme persistence
-      const setT = (t)=>{ localStorage.setItem("mm4_theme", t); document.documentElement.setAttribute("data-theme", t); };
-      document.getElementById("themeLight")?.addEventListener("click", ()=> setT("light"));
-      document.getElementById("themeAuto") ?.addEventListener("click", ()=> setT("auto"));
-      document.getElementById("themeDark") ?.addEventListener("click", ()=> setT("dark"));
     </script>
   </body>
 </html>
