@@ -187,9 +187,12 @@
       <div class="tiny">🧠</div>
       <h1 class="site-title">MindMatch 4</h1>
       <div class="theme-toggle">
-        <button id="themeLight" title="Light">🌞</button>
-        <button id="themeAuto"  title="System">🖥️</button>
-        <button id="themeDark"  title="Dark">🌙</button>
+       <label class="tiny" for="themeSelect" style="margin-right:6px">Theme</label>
+       <select id="themeSelect" aria-label="Theme">
+          <option value="auto">Default</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
       </div>
     </header>
 
