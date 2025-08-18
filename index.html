@@ -2,30 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#ffffff"  media="(prefers-color-scheme: light)">
 
     <title>MindMatch 4 — Adaptive Connect Four | Smart Mind Game</title>
-    <meta name="description" content="MindMatch 4 is an adaptive Connect Four game. The AI learns your style and gets harder as you win. Play vs AI or local multiplayer." />
+    <meta
+      name="description"
+      content="MindMatch 4 is an adaptive Connect Four game. The AI learns your style and gets harder as you win. Play vs AI or local multiplayer."
+    />
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
-    <meta property="og:title" content="MindMatch 4 — Adaptive Connect Four" />
-    <meta property="og:description" content="Beat the AI… if you can. It learns your strategy and ramps up." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://ravi-chandu.github.io/MindMatch4/" />
-    <meta property="og:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
 
-    <!-- Use %BASE_URL% so icons resolve under /MindMatch4/ on Pages -->
+    <!-- Open Graph / Twitter -->
+    <meta property="og:title" content="MindMatch 4 — Adaptive Connect Four">
+    <meta property="og:description" content="Beat the AI… if you can. It learns your strategy and ramps up.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ravi-chandu.github.io/MindMatch4/">
+    <meta property="og:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png">
+
+    <!-- Icons (use %BASE_URL% so they resolve under /MindMatch4/ on GitHub Pages) -->
     <link rel="icon" href="%BASE_URL%favicon.ico" />
-    <link rel="icon" type="image/png" sizes="32x32" href="%BASE_URL%logo-32.png" />
-    <link rel="icon" type="image/png" sizes="64x64" href="%BASE_URL%logo-64.png" />
+    <link rel="icon" type="image/png" sizes="32x32"  href="%BASE_URL%logo-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64"  href="%BASE_URL%logo-64.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="%BASE_URL%logo-192.png" />
     <link rel="apple-touch-icon" sizes="512x512" href="%BASE_URL%logo-512.png" />
-    <link rel="manifest" href="/MindMatch4/manifest.json">
-
-
+    <link rel="manifest" href="/MindMatch4/manifest.json" />
 
     <style>
       :root{
@@ -55,17 +61,35 @@
         --hole:#0f172a; --grid:#1f2937;
       }
       html,body,#root{height:100%}
-      body{margin:0;background:linear-gradient(180deg,var(--bg2),var(--bg));color:var(--ink);
-           font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
-           overflow:hidden}
+      body{
+        margin:0;
+        background:linear-gradient(180deg,var(--bg2),var(--bg));
+        color:var(--ink);
+        font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
+        overflow:hidden
+      }
       #mm4-confetti{position:fixed;inset:0;pointer-events:none;z-index:40}
+
+      /* for Hint highlighting */
+      .hint-col { outline: 3px solid var(--green); outline-offset: 2px; }
+      /* optional toolbar baseline style */
+      .toolbar{
+        position:fixed; left:50%; transform:translateX(-50%);
+        bottom:14px; display:flex; gap:10px; z-index:50;
+        background:var(--panel); border:1px solid var(--panel-border);
+        border-radius:12px; padding:8px 12px; box-shadow:var(--shadow);
+        -webkit-backdrop-filter:saturate(140%) blur(6px); backdrop-filter:saturate(140%) blur(6px);
+      }
+      .toolbar button{ padding:8px 12px; border-radius:10px; border:1px solid var(--grid); background:var(--bg2); color:var(--ink); cursor:pointer }
+      .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
     </style>
 
+    <!-- JSON-LD -->
     <script type="application/ld+json">
-     {
-     "@context": "https://schema.org",
-     "@type": ["Game","VideoGame"],
-     "name": "MindMatch 4 — Adaptive Connect Four",
+    {
+      "@context": "https://schema.org",
+      "@type": ["Game","VideoGame"],
+      "name": "MindMatch 4 — Adaptive Connect Four",
       "url": "https://ravi-chandu.github.io/MindMatch4/",
       "applicationCategory": "Game",
       "operatingSystem": "Web",
@@ -75,38 +99,50 @@
       "description": "Smart, adaptive Connect Four with explainable hints, skill-based AI, and offline play.",
       "author": {"@type":"Person","name":"Ravi Chandu"},
       "publisher": {"@type":"Person","name":"Ravi Chandu"}
-      }
-     </script>
-
-    <script>
-    if ("serviceWorker" in navigator) {
-     navigator.serviceWorker.register("/MindMatch4/sw.js");
-     }
+    }
     </script>
- 
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-E18C1B9SE4"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
 
-  gtag('config', 'G-E18C1B9SE4');
-</script>
+    <!-- Service Worker (PWA) -->
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/MindMatch4/sw.js");
+      }
+    </script>
 
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-E18C1B9SE4"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', 'G-E18C1B9SE4');
+    </script>
   </head>
+
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
-<script type="module">
-  import "./ai/mm4-plugin.js";
-</script>
-<!-- Optional quick UI -->
-<div class="toolbar">
-  <button id="btnHint" aria-label="Show hint">Hint</button>
-  <button id="btnDaily">Daily Puzzle</button>
-  <span id="announce" aria-live="polite" class="sr-only"></span>
-</div>
 
+    <!-- Your app entry (keep whatever your build expects) -->
+    <script type="module" src="/src/main.jsx"></script>
+
+    <!-- MindMatch4 AI wiring -->
+    <script type="module">
+      import "./ai/adapter.js";          // auto-detect board shape & expose helpers
+      import "./ai/mm4-plugin.js";       // core AI (engine, rating, coach, challenges)
+      import "./ai/mm4-plugin-wire.js";  // connects buttons + turn flow + announces results
+
+      // Bind custom analytics events to your existing GA4 tag:
+      window.addEventListener("mm4:hint",   (e)=> gtag('event','hint_used',{count:e.detail?.best?.length||0}));
+      window.addEventListener("mm4:daily",  ()=> gtag('event','daily_loaded'));
+      window.addEventListener("mm4:aimove", (e)=> gtag('event','ai_move',{col:e.detail?.col}));
+      window.addEventListener("mm4:gameend",(e)=> gtag('event','game_end',{outcome:e.detail?.outcome}));
+    </script>
+
+    <!-- Optional quick UI -->
+    <div class="toolbar">
+      <button id="btnHint" aria-label="Show hint">Hint</button>
+      <button id="btnDaily">Daily Puzzle</button>
+      <span id="announce" aria-live="polite" class="sr-only"></span>
+    </div>
+  </body>
 </html>
