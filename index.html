@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="auto">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
@@ -10,7 +10,7 @@
     <meta name="description" content="MindMatch 4 is an adaptive Connect Four game. The AI learns your style and gets harder as you win. Play vs AI or local multiplayer." />
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
 
-    <!-- OG/Twitter -->
+    <!-- Social -->
     <meta property="og:title" content="MindMatch 4 — Adaptive Connect Four" />
     <meta property="og:description" content="Beat the AI… if you can. It learns your strategy and ramps up." />
     <meta property="og:type" content="website" />
@@ -32,10 +32,9 @@
         --bg:#ffffff; --bg2:#f3f4f6; --ink:#111827; --muted:#6b7280;
         --panel:rgba(255,255,255,.92); --panel-border:rgba(0,0,0,.08);
         --hole:#e5e7eb; --grid:#d1d5db;
-        --red:#ef4444; --yellow:#fbbf24; --green:#16a34a;
+        --red:#ef4444; --yellow:#fbbf24; --green:#16a34a; --blue:#3b82f6; --violet:#7c3aed;
         --shadow:0 10px 30px rgba(0,0,0,.12);
-        --cell: 56px;                      /* auto-updated by JS below */
-        --gap: 10px;
+        --cell: 56px; --gap: 10px; /* updated by fitCell() */
       }
       @media (prefers-color-scheme: dark){
         :root{
@@ -45,41 +44,102 @@
           --shadow:0 14px 36px rgba(0,0,0,.42);
         }
       }
+      [data-theme="light"]{
+        --bg:#ffffff; --bg2:#f3f4f6; --ink:#111827; --muted:#6b7280;
+        --panel:rgba(255,255,255,.92); --panel-border:rgba(0,0,0,.08);
+        --hole:#e5e7eb; --grid:#d1d5db;
+      }
+      [data-theme="dark"]{
+        --bg:#0b1222; --bg2:#0f172a; --ink:#e5e7eb; --muted:#94a3b8;
+        --panel:rgba(17,24,39,.85); --panel-border:rgba(255,255,255,.08);
+        --hole:#0f172a; --grid:#1f2937;
+      }
+
       html,body,#root{height:100%}
       body{
         margin:0;
         background:linear-gradient(180deg,var(--bg2),var(--bg));
         color:var(--ink);
         font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
-        overflow:auto; /* allow scroll when needed */
+        overflow:auto; /* vertical scroll only if needed */
       }
 
-      /* Top bar with Hint/Daily stays in-frame (no overlap with board) */
-      .top-toolbar{
+      /* Header with centered title */
+      .site-header{
         position:sticky; top:0; z-index:50;
-        display:flex; gap:8px; align-items:center; justify-content:center;
-        padding:8px; background:var(--panel); border-bottom:1px solid var(--panel-border);
+        display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+        gap:8px; padding:8px;
+        background:var(--panel); border-bottom:1px solid var(--panel-border);
         -webkit-backdrop-filter:saturate(140%) blur(6px); backdrop-filter:saturate(140%) blur(6px);
       }
-      .top-toolbar button{
-        padding:8px 12px; border-radius:10px; border:1px solid var(--grid);
-        background:var(--bg2); color:var(--ink); cursor:pointer
-      }
+      .site-title{ text-align:center; font-weight:700; letter-spacing:.4px; }
+      .theme-toggle{ justify-self:end; display:flex; gap:6px }
+      .tiny{ font-size:.9rem; color:var(--muted) }
+
+      .mm4-shell{ display:flex; justify-content:center; padding:12px; width:100%; }
+
       .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
       .hint-col { outline: 3px solid var(--green); outline-offset: 2px; }
 
-      /* Shell centers everything and enables horizontal scroll ONLY if needed */
-      .mm4-shell{ display:flex; align-items:center; justify-content:center; padding:10px 12px 24px; width:100%; }
-      .mm4-shell.scroll-x{ overflow-x:auto; }
+      /* Card/Buttons */
+      .card{
+        background: var(--panel); border:1px solid var(--panel-border);
+        border-radius:12px; padding:14px; box-shadow: var(--shadow);
+      }
+      .big-options{ display:grid; gap:12px; margin: 10px 0; }
+      .big-btn{
+        padding:16px; border-radius:14px; border:1px solid var(--grid);
+        background:var(--bg2); color:var(--ink); cursor:pointer; font-size:1.05rem; font-weight:600;
+      }
+      .big-btn.ai{    border-color: var(--blue) }
+      .big-btn.p2{    border-color: var(--green) }
+      .big-btn.daily{ border-color: var(--violet) }
 
-      /* Confetti layer */
+      /* Toolbar above the board (Home/Reset/Back/Hint) */
+      .modebar{
+        display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:8px 0 10px;
+      }
+      .modebar button{
+        padding:8px 12px; border-radius:10px; border:1px solid var(--grid);
+        background:var(--bg2); color:var(--ink); cursor:pointer
+      }
+
+      /* Board container (no horizontal scrolling; we always fit) */
+      .board-wrap{ position:relative; margin: 0 auto; }
+      .board{
+        display: grid;
+        grid-template-columns: repeat(7, var(--cell));
+        gap: var(--gap);
+        padding: 8px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        width: calc(7 * var(--cell) + 6 * var(--gap));
+        max-width: 100%;
+      }
+      .col{ display:grid; grid-template-rows: repeat(6, var(--cell)); gap: var(--gap); cursor:pointer; }
+      .cell{
+        width: var(--cell); height: var(--cell); border-radius: 14px;
+        background: radial-gradient(circle at 30% 30%, var(--hole), var(--grid));
+        display:flex; align-items:center; justify-content:center; position:relative;
+      }
+      .cell:hover{ outline: 2px dashed var(--muted); outline-offset: 2px; }
+      .disc{
+        width: calc(var(--cell) - 8px); height: calc(var(--cell) - 8px);
+        border-radius: 999px; box-shadow: inset 0 4px 10px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.2);
+      }
+      .disc.yellow{ background: radial-gradient(circle at 32% 28%, #ffe9a8, #fbbf24); border: 2px solid #d1a200; }
+      .disc.red{    background: radial-gradient(circle at 32% 28%, #ff8a8a, #ef4444); border: 2px solid #b91c1c; }
+
+      /* Winner overlay line */
+      .win-overlay{ pointer-events:none; position:absolute; inset:8px; }
+      .win-overlay svg{ width:100%; height:100%; }
+
+      /* Stats under board */
+      .stats{ margin: 10px auto; text-align:center; color: var(--muted) }
       #mm4-confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
     </style>
-
-    <!-- JSON-LD -->
-    <script type="application/ld+json">
-    {"@context":"https://schema.org","@type":["Game","VideoGame"],"name":"MindMatch 4 — Adaptive Connect Four","url":"https://ravi-chandu.github.io/MindMatch4/","applicationCategory":"Game","operatingSystem":"Web","inLanguage":"en","gamePlatform":"Web","genre":["Strategy","Board game","Puzzle"],"description":"Smart, adaptive Connect Four with explainable hints, skill-based AI, and offline play.","author":{"@type":"Person","name":"Ravi Chandu"},"publisher":{"@type":"Person","name":"Ravi Chandu"}}
-    </script>
 
     <!-- PWA -->
     <script>
@@ -88,7 +148,7 @@
       }
     </script>
 
-    <!-- GA4 (your ID) -->
+    <!-- GA4 -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-E18C1B9SE4"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -97,26 +157,24 @@
       gtag('config', 'G-E18C1B9SE4');
     </script>
 
-    <!-- Precise responsive cell sizing: fit 7x6; scroll-x only if absolutely necessary -->
+    <!-- Fit 7x6 strictly inside available width/height (no side scroll) -->
     <script>
-      function fitCell(){
-        const shell = document.querySelector('.mm4-shell');
-        const toolbarH = (document.querySelector('.top-toolbar')?.offsetHeight||0);
-        const gap = 10; // keep in sync with --gap
-        const shellW = shell ? shell.getBoundingClientRect().width : window.innerWidth;
-        const availW = shellW - 24 - 16;     // shell pads (12+12) & board pads (8+8)
-        const availH = window.innerHeight - toolbarH - 180; // leave for headers/status
+      function currentTheme(){
+        const t = localStorage.getItem("mm4_theme") || "auto";
+        document.documentElement.setAttribute("data-theme", t);
+      }
+      currentTheme();
 
-        const cellFromW = Math.floor((availW - gap*6) / 7);
+      function fitCell(){
+        const gap = 10; // keep in sync with CSS
+        const shellW = Math.max(document.documentElement.clientWidth, window.innerWidth || 0) - 24; // page padding
+        const toolbarH = (document.querySelector('.site-header')?.offsetHeight||0);
+        const availH = Math.max(document.documentElement.clientHeight, window.innerHeight||0) - toolbarH - 220; // headroom
+        const cellFromW = Math.floor((shellW - 16 - gap*6) / 7); // board padding 8+8
         const cellFromH = Math.floor((availH - gap*5) / 6);
-        const size = Math.max(28, Math.min(96, Math.min(cellFromW, cellFromH)));
+        const size = Math.max(26, Math.min(96, Math.min(cellFromW, cellFromH)));
         document.documentElement.style.setProperty('--gap', gap + 'px');
         document.documentElement.style.setProperty('--cell', size + 'px');
-
-        // Decide if horizontal scroll is still needed:
-        const boardOuterW = (7*size + 6*gap) + 16; // + board padding
-        const needsX = boardOuterW > (shellW + 1);
-        shell?.classList.toggle('scroll-x', needsX);
       }
       addEventListener('resize', fitCell);
       addEventListener('orientationchange', fitCell);
@@ -125,21 +183,21 @@
   </head>
 
   <body>
-    <!-- Controls always visible -->
-    <div class="top-toolbar">
-      <button id="btnHome">Home</button>
-      <button id="btnInstructions">Instructions</button>
-      <button id="btnStats">Stats</button>
-      <span style="flex:1"></span>
-      <button id="btnHint" aria-label="Show hint">Hint</button>
-      <button id="btnDaily">Daily Puzzle</button>
-      <span id="announce" aria-live="polite" class="sr-only"></span>
-    </div>
+    <header class="site-header">
+      <div class="tiny">🧠</div>
+      <h1 class="site-title">MindMatch 4</h1>
+      <div class="theme-toggle">
+        <button id="themeLight" title="Light">🌞</button>
+        <button id="themeAuto"  title="System">🖥️</button>
+        <button id="themeDark"  title="Dark">🌙</button>
+      </div>
+    </header>
 
     <div id="root" class="mm4-shell"></div>
     <canvas id="mm4-confetti"></canvas>
+    <span id="announce" aria-live="polite" class="sr-only"></span>
 
-    <!-- Vite dev entry (rewritten to hashed assets on build) -->
+    <!-- Vite entry -->
     <script type="module" src="/src/main.jsx"></script>
 
     <!-- AI wiring -->
@@ -148,14 +206,16 @@
       import "./ai/mm4-plugin.js";
       import "./ai/mm4-plugin-wire.js";
 
-      // Analytics events
       window.addEventListener("mm4:hint",   (e)=> window.gtag && gtag('event','hint_used',{count:e.detail?.best?.length||0}));
       window.addEventListener("mm4:daily",  ()=> window.gtag && gtag('event','daily_loaded'));
       window.addEventListener("mm4:aimove", (e)=> window.gtag && gtag('event','ai_move',{col:e.detail?.col}));
       window.addEventListener("mm4:gameend",(e)=> window.gtag && gtag('event','game_end',{outcome:e.detail?.outcome}));
-      // simple client-side nav
-      const nav = (id, to) => document.getElementById(id)?.addEventListener('click', () => window.dispatchEvent(new CustomEvent('mm4:navigate',{detail:{to}})));
-      nav('btnHome','home'); nav('btnInstructions','instructions'); nav('btnStats','stats');
+
+      // Theme persistence
+      const setT = (t)=>{ localStorage.setItem("mm4_theme", t); document.documentElement.setAttribute("data-theme", t); };
+      document.getElementById("themeLight")?.addEventListener("click", ()=> setT("light"));
+      document.getElementById("themeAuto") ?.addEventListener("click", ()=> setT("auto"));
+      document.getElementById("themeDark") ?.addEventListener("click", ()=> setT("dark"));
     </script>
   </body>
 </html>
