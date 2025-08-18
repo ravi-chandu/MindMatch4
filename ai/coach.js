@@ -1,4 +1,4 @@
-// ai/coach.js
+// ai/coach.js 
 import { legalMoves, play, winner, bestMoveTimeboxed } from "./engine.js";
 import { getSkill, paramsFor, updateSkill } from "./rating.js";
 
