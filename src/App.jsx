@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { winner as evalWinner } from "../ai/engine.js";
+import { winner as evalWinner } from "../ai/engine.js"; 
 
 const ROWS = 6, COLS = 7;
 const emptyBoard = () => Array.from({length: COLS}, () => []);
