@@ -1,7 +1,7 @@
 // ai/mm4-plugin.js
 // Zero-config plugin: exposes window.MindMatchAI and optional UI hooks.
 // Integrate by calling provided APIs from your existing game loop.
-import * as Engine from "./engine.js";
+import * as Engine from "./engine.js"; 
 import { aiMove, onGameEnd, computeHints } from "./coach.js";
 import { todaySeed } from "./challenge.js";
 import { getSkill } from "./rating.js";
