@@ -31,7 +31,7 @@
       :root{
         --bg:#ffffff; --bg2:#f3f4f6; --ink:#111827; --muted:#6b7280;
         --panel:rgba(255,255,255,.92); --panel-border:rgba(0,0,0,.08);
-        --hole:#e5e7eb; --grid:#d1d5db;
+        --hole:#e5e7eb; --grid:#1f2937;
         --red:#ef4444; --yellow:#fbbf24; --green:#16a34a; --blue:#3b82f6; --violet:#7c3aed;
         --shadow:0 10px 30px rgba(0,0,0,.12);
         --cell: 56px; --gap: 10px; /* updated by fitCell() */
@@ -65,7 +65,7 @@
         background:linear-gradient(180deg,var(--bg2),var(--bg));
         color:var(--ink);
         font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
-        overflow-y:auto; /* vertical scroll only if needed */
+        overflow-y:auto;
       }
 
       /* Header with centered title */
@@ -99,7 +99,7 @@
       .big-btn.p2{    border-color: var(--green) }
       .big-btn.daily{ border-color: var(--violet) }
 
-      /* Toolbar above the board (Home/Reset/Back/Hint) */
+      /* Toolbar above the board (Home/Reset/Hint) */
       .modebar{
         display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:8px 0 10px;
       }
@@ -108,7 +108,7 @@
         background:var(--bg2); color:var(--ink); cursor:pointer
       }
 
-      /* Board container (no horizontal scrolling; we always fit) */
+      /* Board container – CENTERED; width equals grid only (no giant panel) */
       .board-wrap{ position:relative; margin: 0 auto; }
       .board{
         display: grid;
@@ -119,8 +119,8 @@
         border: 1px solid var(--panel-border);
         border-radius: 14px;
         box-shadow: var(--shadow);
-        width: min(calc(7 * var(--cell) + 6 * var(--gap)), calc(100vw - 24px));
-        max-width: 100%;
+        width: calc(7 * var(--cell) + 6 * var(--gap));
+        margin: 0 auto;            /* <— keep grid centered */
       }
       .col{ display:grid; grid-template-rows: repeat(6, var(--cell)); gap: var(--gap); cursor:pointer; }
       .cell{
@@ -140,11 +140,19 @@
       .win-overlay{ pointer-events:none; position:absolute; inset:8px; }
       .win-overlay svg{ width:100%; height:100%; }
 
+      /* Result modal */
+      .modal{ position: fixed; inset: 0; z-index: 70; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,.35); }
+      .dialog{ background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px; padding: 16px; width: min(92vw, 420px); color: var(--ink); box-shadow: var(--shadow); }
+      .dialog h2{ margin: 0 0 8px; }
+      .dialog .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; justify-content:center }
+      .dialog button{ padding:8px 12px; border-radius:10px; border:1px solid var(--grid); background:var(--bg2); color:var(--ink); cursor:pointer }
+
       /* Stats under board */
       .stats{ margin: 10px auto; text-align:center; color: var(--muted) }
+
       #mm4-confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
 
-      /* First-time guided move pulse (class is applied from App.jsx) */
+      /* First-time guided move pulse */
       @keyframes mm4Pulse { 0%{box-shadow:0 0 0 0 rgba(59,130,246,.45)} 70%{box-shadow:0 0 0 18px rgba(59,130,246,0)} 100%{box-shadow:0 0 0 0 rgba(59,130,246,0)} }
       .onboard-pulse { outline: 3px solid #3b82f6; outline-offset: 2px; animation: mm4Pulse 1.2s ease-out 2; border-radius:12px; }
     </style>
@@ -196,15 +204,15 @@
       currentTheme();
 
       function fitCell(){
-        const gap = 10; // keep in sync
-        const pagePad = 24;          // left+right content padding
-        const boardPad = 16;         // .board padding 8+8
+        const gap = 10;         // keep in sync
+        const pagePad = 24;     // left+right content padding
+        const boardPad = 16;    // .board padding 8+8
         const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
         const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
         const headerH = (document.querySelector('.site-header')?.offsetHeight || 0);
 
         const availW = vw - pagePad - boardPad - 1; // -1 avoids rounding spill
-        const availH = vh - headerH - 220;          // headroom for bars/status
+        const availH = vh - headerH - 220;          // headroom
 
         const cellFromW = Math.floor((availW - gap*6) / 7);
         const cellFromH = Math.floor((availH - gap*5) / 6);
@@ -241,18 +249,18 @@
     <!-- Vite entry -->
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- Minimal boot + lazy AI wiring (so CSS/HTML paint first) -->
+    <!-- Minimal boot + lazy AI wiring -->
     <script type="module">
       // Title → Home
       document.querySelector(".site-title")?.addEventListener("click", ()=>{
         window.dispatchEvent(new CustomEvent("mm4:navigate",{detail:{to:"home"}}));
       });
 
-      // Theme persistence via <select>
+      // Theme persistence
       const setT = (t)=>{ localStorage.setItem("mm4_theme", t); document.documentElement.setAttribute("data-theme", t); };
       document.getElementById("themeSelect")?.addEventListener("change", (e)=> setT(e.target.value));
 
-      // Lazy-load AI extras without blocking first paint
+      // Lazy-load AI extras (non-blocking)
       const idle = window.requestIdleCallback || ((fn)=> setTimeout(fn, 1));
       idle(async ()=>{
         await import("./ai/adapter.js");
@@ -260,7 +268,7 @@
         await import("./ai/mm4-plugin-wire.js");
       });
 
-      // Analytics events
+      // Analytics hooks
       window.addEventListener("mm4:hint",   (e)=> window.gtag && gtag('event','hint_used',{count:e.detail?.best?.length||0}));
       window.addEventListener("mm4:daily",  ()=> window.gtag && gtag('event','daily_loaded'));
       window.addEventListener("mm4:aimove", (e)=> window.gtag && gtag('event','ai_move',{col:e.detail?.col}));
