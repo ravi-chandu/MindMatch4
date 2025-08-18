@@ -60,14 +60,24 @@
     }
     return false;
   }
+  let lastHintTimer = null;
   function highlightCols(cols){
     document.querySelectorAll(".col,.column,[data-col]").forEach(el=>el.classList.remove("hint-col"));
     cols.forEach(c=>{
       const sel = `[data-col="${c}"]`;
-      document.querySelectorAll(sel).forEach(el=>el.classList.add("hint-col"));
+      const targets = document.querySelectorAll(sel);
+      targets.forEach(el=>el.classList.add("hint-col"));
       const header = document.querySelector(`.col-${c}`);
       if (header) header.classList.add("hint-col");
+      const t = targets[0] || header;
+      if (t && typeof t.scrollIntoView === "function"){
+        t.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+      }
     });
+    if (lastHintTimer) clearTimeout(lastHintTimer);
+    lastHintTimer = setTimeout(()=>{
+      document.querySelectorAll(".hint-col").forEach(el=>el.classList.remove("hint-col"));
+    }, 2500);
   }
   W.getBoardState = W.getBoardState || sniffBoard;
   W.loadBoardState = W.loadBoardState || setBoard;
