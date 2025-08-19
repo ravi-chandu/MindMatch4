@@ -5,7 +5,7 @@ const ROWS = 6, COLS = 7;
 const emptyBoard = () => Array.from({length: COLS}, () => []);
 const clampCol = (c)=> Math.max(0, Math.min(COLS-1, c));
 
-/* ---- closeness + comments ---- */
+/* closeness + comments */
 function nearWinScore(board, player=1){
   const at = (r,c)=> (r<0||r>=ROWS||c<0||c>=COLS) ? -99 : ((board[c][ROWS-1-r] ?? 0));
   let score=0;
@@ -42,7 +42,7 @@ function engageMessage(outcome, {ms=0, near=0}={}){
   return pick(DRAW);
 }
 
-/* ---- confetti ---- */
+/* confetti */
 function fireConfetti(canvas){
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -52,7 +52,7 @@ function fireConfetti(canvas){
   setTimeout(()=>{ clearInterval(id); ctx.clearRect(0,0,W,H); },1800);
 }
 
-/* ---- share ---- */
+/* share text */
 function shareText(board, outcome){
   const map = { "-1":"🔴", "1":"🟡", "0":"⚫" };
   let rows = [];
@@ -118,14 +118,14 @@ function Home({onPlayAI,onPlay2P,onDaily}){
 function Game({mode, seedDaily, onBack}){
   const [board, setBoard] = useState(()=> emptyBoard());
   const [turn, setTurn] = useState(1);                // 1=You/P1, -1=AI/P2
-  const [end, setEnd] = useState(null);               // "player_win" | "ai_win" | "draw" | null (keys used only for AI stats)
+  const [end, setEnd] = useState(null);               // "player_win" | "ai_win" | "draw"
   const [winLine, setWinLine] = useState(null);
   const [talk, setTalk] = useState("");
 
-  // stats (count only for AI games)
+  // AI-only stats
   const [stats, setStats] = useState(()=> JSON.parse(localStorage.getItem("mm4_stats")||`{"games":0,"wins":0,"losses":0,"draws":0,"streak":0}`));
   const record = (outcomeKey)=>{
-    if (mode!=="ai") return; // only vs AI
+    if (mode!=="ai") return;
     const s = {...stats};
     s.games++;
     if (outcomeKey==="player_win"){ s.wins++; s.streak = Math.max(1, s.streak+1); }
@@ -136,7 +136,6 @@ function Game({mode, seedDaily, onBack}){
   };
   const resetStats = ()=>{ const s={games:0,wins:0,losses:0,draws:0,streak:0}; localStorage.setItem("mm4_stats", JSON.stringify(s)); setStats(s); };
 
-  // timers for engagement copy
   const startRef = useRef(Date.now());
 
   // seed daily
@@ -147,7 +146,7 @@ function Game({mode, seedDaily, onBack}){
     // eslint-disable-next-line
   }, []);
 
-  // expose to AI adapter + Hint
+  // expose APIs + hint helpers
   useEffect(()=>{
     window.board = board;
     window.turn = turn;
@@ -156,11 +155,7 @@ function Game({mode, seedDaily, onBack}){
     window.loadBoardState = (b) => { setBoard(b); setTurn(1); setEnd(null); setWinLine(null); setTalk(""); startRef.current = Date.now(); };
     window.renderBoard = (b) => setBoard(b);
     window.dropPiece = (col) => place(col, turn);
-
-    // let the coach play its move
-    window.applyMove = (col) => place(col, -1);
-
-    // highlight columns for Hint (briefly)
+    window.applyMove = (col) => place(col, -1); // allow AI to place
     window.highlightCols = (cols=[])=>{
       document.querySelectorAll('.hint-col').forEach(el=>el.classList.remove('hint-col'));
       cols.forEach(c=>{
@@ -170,7 +165,31 @@ function Game({mode, seedDaily, onBack}){
     };
   }, [board, turn, mode]);
 
-  // first-time “drop here” pulse on center column
+  // robust Hint: use plugin if present, else fallback
+  useEffect(()=>{
+    const btn = document.getElementById("btnHint");
+    if (!btn) return;
+    const handler = () => {
+      if (window.computeHints) {
+        const h = window.computeHints(board, 1);
+        window.highlightCols?.(h?.best || []);
+        const a = document.getElementById("announce");
+        if (a && h?.note) a.textContent = `${h.note} (${(h.best||[]).join(",")})`;
+        window.dispatchEvent(new CustomEvent("mm4:hint",{detail:h}));
+      } else {
+        const playable = [];
+        for (let c=0;c<COLS;c++) if ((board[c]?.length||0) < ROWS) playable.push(c);
+        window.highlightCols?.(playable.slice(0,3));
+        const a = document.getElementById("announce");
+        if (a) a.textContent = `Try these columns: ${playable.slice(0,3).join(", ")}`;
+        window.dispatchEvent(new CustomEvent("mm4:hint",{detail:{best:playable.slice(0,3), note:"Suggested"}}));
+      }
+    };
+    btn.addEventListener("click", handler);
+    return ()=> btn.removeEventListener("click", handler);
+  }, [board]);
+
+  // first-time “drop here” pulse (optional: keep if you like)
   useEffect(()=>{
     const key = "mm4_seen_onboarding";
     if (localStorage.getItem(key)) return;
@@ -182,7 +201,6 @@ function Game({mode, seedDaily, onBack}){
     }
   }, []);
 
-  // UI message by mode
   const statusText = end
     ? (mode==="ai"
         ? (end==="player_win" ? "You win!" : end==="ai_win" ? "AI wins!" : "Draw")
@@ -219,17 +237,13 @@ function Game({mode, seedDaily, onBack}){
     const near = nearWinScore(board, 1);
     setTalk(engageMessage(outcomeKey, {ms, near}));
 
-    // Confetti on both sides’ wins
     const canvas = document.getElementById("mm4-confetti");
     if (canvas && (outcomeKey==="player_win" || outcomeKey==="ai_win")) fireConfetti(canvas);
 
-    // live region (accessibility)
     const announce = document.getElementById("announce");
     if (announce) announce.textContent = `${statusText} — ${talk}`;
 
-    // only record vs AI
     record(outcomeKey);
-
     window.dispatchEvent(new CustomEvent("mm4:gameend",{detail:{outcome:outcomeKey}}));
     if (window.MindMatchAI?.onGameEnd) window.MindMatchAI.onGameEnd(outcomeKey);
     return true;
@@ -250,7 +264,7 @@ function Game({mode, seedDaily, onBack}){
 
   return (
     <>
-      {/* Action bar above the board (Home / Reset / Hint) — NO Daily here */}
+      {/* Controls */}
       <div className="modebar">
         <button onClick={onBack}>Home</button>
         <button onClick={reset}>Reset</button>
@@ -278,11 +292,10 @@ function Game({mode, seedDaily, onBack}){
             </div>
           ))}
         </div>
-        {/* Winning line overlay ABOVE the board (z-indexed) */}
         {!!winLine && <WinOverlay line={winLine} />}
       </div>
 
-      {/* Stats under the board (AI only – but we still display the saved AI stats) */}
+      {/* AI-only stats (still visible; only updated in AI games) */}
       <div className="stats">
         <div>📊 Games: <b>{stats.games}</b> · ✅ Wins: <b>{stats.wins}</b> · ❌ Losses: <b>{stats.losses}</b> · 🤝 Draws: <b>{stats.draws}</b> · 🔥 Streak: <b>{stats.streak}</b></div>
         <div style={{marginTop:"6px"}}>
