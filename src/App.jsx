@@ -5,7 +5,12 @@ const ROWS = 6, COLS = 7;
 const emptyBoard = () => Array.from({length: COLS}, () => []);
 const clampCol = (c)=> Math.max(0, Math.min(COLS-1, c));
 
-/* closeness + comments */
+/* ---------- helpers: board sim ---------- */
+function cloneBoard(b){ return b.map(col => col.slice()); }
+function canPlay(b,c){ return (b[c]?.length||0) < ROWS; }
+function play(b,c,p){ const nb = cloneBoard(b); nb[c] = (nb[c]||[]).concat(p); return nb; }
+
+/* ---------- closeness + engagement copy ---------- */
 function nearWinScore(board, player=1){
   const at = (r,c)=> (r<0||r>=ROWS||c<0||c>=COLS) ? -99 : ((board[c][ROWS-1-r] ?? 0));
   let score=0;
@@ -28,7 +33,7 @@ function engageMessage(outcome, {ms=0, near=0}={}){
   const pick = (a)=> a[Math.floor(Math.random()*a.length)];
   const AI = [
     close ? "So close! I squeezed a line. Rematch? 😉" : "Gotcha 😏 — try again?",
-    veryClose ? "You nearly had me there. One different drop and it's yours." : "Watch diagonals. Hint helps in tight spots.",
+    veryClose ? "You nearly had me. One different drop and it’s yours." : "Watch diagonals. Hint helps in tight spots.",
     long ? "Epic grind! I found the last thread. Another round?" : "Bet you can’t beat me twice."
   ];
   const YOU = [
@@ -42,7 +47,7 @@ function engageMessage(outcome, {ms=0, near=0}={}){
   return pick(DRAW);
 }
 
-/* confetti */
+/* ---------- lightweight confetti ---------- */
 function fireConfetti(canvas){
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -52,7 +57,7 @@ function fireConfetti(canvas){
   setTimeout(()=>{ clearInterval(id); ctx.clearRect(0,0,W,H); },1800);
 }
 
-/* share text */
+/* ---------- share ---------- */
 function shareText(board, outcome){
   const map = { "-1":"🔴", "1":"🟡", "0":"⚫" };
   let rows = [];
@@ -67,6 +72,59 @@ function shareText(board, outcome){
   const head = `MindMatch 4 — ${outcome==="player_win"?"I won":"They won"}\n`;
   const body = rows.join("\n");
   return `${head}${body}\nhttps://ravi-chandu.github.io/MindMatch4/`;
+}
+
+/* ---------- SMART LOCAL HINTS (no plugin needed) ---------- */
+/* Strategy:
+   1) If we can win now, return that column.
+   2) If opponent can win next, block those.
+   3) Avoid moves that let opponent win immediately after (suicides).
+   4) Score remaining by: center preference + our threats - opp threats. */
+const CENTER_PREF = [3,4,6,7,6,4,3]; // favor center columns (index 3 highest)
+function computeLocalHints(board, player=1){
+  const legal = [];
+  for (let c=0;c<COLS;c++) if (canPlay(board,c)) legal.push(c);
+  if (!legal.length) return { best:[], note:"No moves" };
+
+  // 1) Immediate win for us?
+  for (const c of legal){
+    const nb = play(board, c, player);
+    if (Engine.winner(nb) === player) return { best:[c], note:"Winning move" };
+  }
+
+  // 2) Blocks: if opponent wins next, block those columns
+  const opp = -player;
+  const mustBlock = [];
+  for (const c of legal){
+    const nb = play(board, c, opp);
+    if (Engine.winner(nb) === opp) mustBlock.push(c);
+  }
+  if (mustBlock.length) return { best: mustBlock, note:"Block opponent" };
+
+  // 3) Score remaining, avoiding suicides
+  const scored = [];
+  for (const c of legal){
+    const nb = play(board, c, player);
+
+    // suicide check: does opponent have immediate win after we play here?
+    let oppWinsNext = false;
+    for (let oc=0; oc<COLS; oc++){
+      if (!canPlay(nb, oc)) continue;
+      const ob = play(nb, oc, opp);
+      if (Engine.winner(ob) === opp){ oppWinsNext = true; break; }
+    }
+    if (oppWinsNext){ scored.push({c, score: -1e6}); continue; }
+
+    // heuristic: center bias + our threats - opp threats
+    const ourThreats = nearWinScore(nb, player);
+    const oppThreats = nearWinScore(nb, opp);
+    const score = CENTER_PREF[c] + 3*ourThreats - 2*oppThreats;
+    scored.push({c, score});
+  }
+
+  scored.sort((a,b)=> b.score - a.score);
+  const top = scored.filter(s=> s.score>-1e6).slice(0,3).map(s=> s.c);
+  return { best: top, note:"Best by heuristic", all: scored };
 }
 
 export default function App(){
@@ -146,7 +204,7 @@ function Game({mode, seedDaily, onBack}){
     // eslint-disable-next-line
   }, []);
 
-  // expose APIs + hint helpers
+  // expose to AI adapter + hint highlighting
   useEffect(()=>{
     window.board = board;
     window.turn = turn;
@@ -155,7 +213,7 @@ function Game({mode, seedDaily, onBack}){
     window.loadBoardState = (b) => { setBoard(b); setTurn(1); setEnd(null); setWinLine(null); setTalk(""); startRef.current = Date.now(); };
     window.renderBoard = (b) => setBoard(b);
     window.dropPiece = (col) => place(col, turn);
-    window.applyMove = (col) => place(col, -1); // allow AI to place
+    window.applyMove = (col) => place(col, -1);
     window.highlightCols = (cols=[])=>{
       document.querySelectorAll('.hint-col').forEach(el=>el.classList.remove('hint-col'));
       cols.forEach(c=>{
@@ -163,33 +221,27 @@ function Game({mode, seedDaily, onBack}){
         if (el){ el.classList.add('hint-col'); setTimeout(()=> el.classList.remove('hint-col'), 1600); }
       });
     };
+
+    // also expose our local compute for the plugin to use if it wants
+    window.computeHints = window.computeHints || ((b,p)=>computeLocalHints(b,p));
   }, [board, turn, mode]);
 
-  // robust Hint: use plugin if present, else fallback
+  // robust Hint (plugin preferred; else smart local)
   useEffect(()=>{
     const btn = document.getElementById("btnHint");
-    if (!btn) return;
+    if (!btn || mode!=="ai") return;
     const handler = () => {
-      if (window.computeHints) {
-        const h = window.computeHints(board, 1);
-        window.highlightCols?.(h?.best || []);
-        const a = document.getElementById("announce");
-        if (a && h?.note) a.textContent = `${h.note} (${(h.best||[]).join(",")})`;
-        window.dispatchEvent(new CustomEvent("mm4:hint",{detail:h}));
-      } else {
-        const playable = [];
-        for (let c=0;c<COLS;c++) if ((board[c]?.length||0) < ROWS) playable.push(c);
-        window.highlightCols?.(playable.slice(0,3));
-        const a = document.getElementById("announce");
-        if (a) a.textContent = `Try these columns: ${playable.slice(0,3).join(", ")}`;
-        window.dispatchEvent(new CustomEvent("mm4:hint",{detail:{best:playable.slice(0,3), note:"Suggested"}}));
-      }
+      const h = (window.computeHints ? window.computeHints(board, 1) : computeLocalHints(board, 1));
+      window.highlightCols?.(h?.best || []);
+      const a = document.getElementById("announce");
+      if (a && h?.note) a.textContent = `${h.note}: ${(h.best||[]).join(",")}`;
+      window.dispatchEvent(new CustomEvent("mm4:hint",{detail:h}));
     };
     btn.addEventListener("click", handler);
     return ()=> btn.removeEventListener("click", handler);
-  }, [board]);
+  }, [board, mode]);
 
-  // first-time “drop here” pulse (optional: keep if you like)
+  // first-time “drop here” pulse (optional)
   useEffect(()=>{
     const key = "mm4_seen_onboarding";
     if (localStorage.getItem(key)) return;
@@ -210,10 +262,9 @@ function Game({mode, seedDaily, onBack}){
   function place(col, who){
     if (end) return false;
     const c = clampCol(col);
-    if ((board[c]?.length||0) >= ROWS) return false;
+    if (!canPlay(board,c)) return false;
 
-    const nb = board.map(x=>x.slice());
-    nb[c] = (nb[c]||[]).concat(who);
+    const nb = play(board, c, who);
     setBoard(nb);
 
     const w = Engine.winner(nb);
@@ -295,7 +346,7 @@ function Game({mode, seedDaily, onBack}){
         {!!winLine && <WinOverlay line={winLine} />}
       </div>
 
-      {/* AI-only stats (still visible; only updated in AI games) */}
+      {/* AI-only stats (updated only in AI games) */}
       <div className="stats">
         <div>📊 Games: <b>{stats.games}</b> · ✅ Wins: <b>{stats.wins}</b> · ❌ Losses: <b>{stats.losses}</b> · 🤝 Draws: <b>{stats.draws}</b> · 🔥 Streak: <b>{stats.streak}</b></div>
         <div style={{marginTop:"6px"}}>
