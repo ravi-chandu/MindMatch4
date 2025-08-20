@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as Engine from "../ai/engine.js";
 
-/* ========== Board basics ========== */
 const ROWS = 6, COLS = 7;
 const emptyBoard = () => Array.from({length: COLS}, () => []);
 const clampCol = (c)=> Math.max(0, Math.min(COLS-1, c));
@@ -9,7 +8,7 @@ const canPlay = (b,c)=> (b[c]?.length||0) < ROWS;
 const clone = (b)=> b.map(col=>col.slice());
 const play = (b,c,p)=>{ const nb = clone(b); nb[c] = (nb[c]||[]).concat(p); return nb; };
 
-/* ========== Threat counting (for hints & scoring) ========== */
+/* --- threat counter for hints/scoring --- */
 function nearWinScore(board, player=1){
   const at = (r,c)=> (r<0||r>=ROWS||c<0||c>=COLS) ? -99 : ((board[c][ROWS-1-r] ?? 0));
   let score=0;
@@ -27,7 +26,7 @@ function nearWinScore(board, player=1){
   return score;
 }
 
-/* ========== Engagement copy for result modal ========== */
+/* --- win/lose/draw quips --- */
 function engageMessage(outcome, {ms=0, near=0}={}){
   const quick = ms<45000, long = ms>180000;
   const close = near>=1, veryClose = near>=2;
@@ -48,7 +47,7 @@ function engageMessage(outcome, {ms=0, near=0}={}){
   return pick(DRAW);
 }
 
-/* ========== Confetti ========== */
+/* --- confetti --- */
 function fireConfetti(canvas){
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -68,7 +67,7 @@ function fireConfetti(canvas){
   setTimeout(()=>{ clearInterval(id); ctx.clearRect(0,0,W,H); },1800);
 }
 
-/* ========== Share copy ========== */
+/* --- share --- */
 function shareText(board, outcome){
   const map = { "-1":"🔴", "1":"🟡", "0":"⚫" };
   let rows = [];
@@ -84,41 +83,33 @@ function shareText(board, outcome){
   return `${head}${rows.join("\n")}\nhttps://ravi-chandu.github.io/MindMatch4/`;
 }
 
-/* ========== SMART HINTS with reasons ========== */
-const CENTER_PREF = [3,4,5,6,5,4,3]; // stronger center bias
+/* --- Hints with reasons --- */
+const CENTER_PREF = [3,4,5,6,5,4,3];
 function reasonFor(board, player, col){
   if (!canPlay(board,col)) return null;
   const opp = -player;
   const nb = play(board, col, player);
   if (Engine.winner(nb) === player) return {col, tag:"win", note:"Winning move"};
-  // block?
   if (Engine.winner(play(board, col, opp)) === opp) return {col, tag:"block", note:"Block opponent"};
-  // fork-ish (creates multiple threats)
   const ourThreats = nearWinScore(nb, player);
   if (ourThreats >= 2) return {col, tag:"fork", note:"Creates multiple threats"};
-  // center preference
   if (col===3) return {col, tag:"center", note:"Controls center"};
   return {col, tag:"heuristic", note:"Good shape"};
 }
 function computeLocalHints(board, player=1){
   const legal = []; for (let c=0;c<COLS;c++) if (canPlay(board,c)) legal.push(c);
   if (!legal.length) return { best:[], note:"No moves" };
-  // immediate win
   for (const c of legal){ if (Engine.winner(play(board,c,player))===player) return {best:[c], note:"Winning move", reasons:[reasonFor(board,player,c)]}; }
-  // must-block
   const opp = -player, blocks=[];
   for (const c of legal){ if (Engine.winner(play(board,c,opp))===opp) blocks.push(c); }
   if (blocks.length) return { best:blocks, note:"Block opponent", reasons:blocks.map(c=>reasonFor(board,player,c)) };
-
-  // heuristic scores (avoid suicides)
   const scored=[];
   for (const c of legal){
     const nb = play(board,c,player);
-    // suicide: allow immediate opp win?
     let suicide = false;
     for (let oc=0; oc<COLS; oc++){
       if (!canPlay(nb, oc)) continue;
-      if (Engine.winner(play(nb, oc, opp))===opp){ suicide = true; break; }
+      if (Engine.winner(play(nb,oc,opp))===opp){ suicide = true; break; }
     }
     if (suicide){ scored.push({c,score:-1e9, reason:{col:c,tag:"danger",note:"Gives immediate reply"} }); continue; }
     const our = nearWinScore(nb, player);
@@ -131,11 +122,10 @@ function computeLocalHints(board, player=1){
   return { best: top.map(s=>s.c), note:"Best by heuristic", reasons: top.map(s=>s.reason) };
 }
 
-/* ========== Lightweight MCTS-style rollouts (for adaptive AI) ========== */
+/* --- lightweight MCTS rollouts for AI fallback --- */
 function randomHeuristicMove(b, p){
   const cand=[]; for(let c=0;c<COLS;c++) if (canPlay(b,c)) cand.push(c);
   if (!cand.length) return -1;
-  // prefer center-ish randomly
   const weights = cand.map(c=> CENTER_PREF[c]);
   const sum = weights.reduce((a,b)=>a+b,0);
   let r = Math.random()*sum;
@@ -143,7 +133,6 @@ function randomHeuristicMove(b, p){
   return cand[0];
 }
 function playoutWinner(board, startP){
-  // quick random playout to terminal
   let b = clone(board), p = startP, w=Engine.winner(b);
   let safety=72;
   while(w===0 && safety--){
@@ -153,21 +142,15 @@ function playoutWinner(board, startP){
     w = Engine.winner(b);
     p = -p;
   }
-  return w; // 1, -1, 2(draw) or 0 (fallback)
+  return w;
 }
 function mctsPick(board, player, iters=200){
   const moves=[]; for(let c=0;c<COLS;c++) if (canPlay(board,c)) moves.push(c);
   if (!moves.length) return {col:-1, note:"No moves"};
-  // immediate win or block still first
   for (const c of moves){ if (Engine.winner(play(board,c,player))===player) return {col:c, note:"Winning move"}; }
   const opp=-player;
   for (const c of moves){ if (Engine.winner(play(board,c,opp))===opp) return {col:c, note:"Block opponent"}; }
-
-  const scores = new Map(moves.map(c=>[c,0]));
-  for (const c of moves){
-    // small prior for center
-    scores.set(c, CENTER_PREF[c]*0.2);
-  }
+  const scores = new Map(moves.map(c=>[c, CENTER_PREF[c]*0.2]));
   for (let i=0;i<iters;i++){
     const c = moves[i % moves.length];
     const w = playoutWinner(play(board,c,player), -player);
@@ -179,13 +162,23 @@ function mctsPick(board, player, iters=200){
   return { col: best, note: "Monte‑Carlo rollout" };
 }
 
-/* ========== COMPONENTS ========== */
+/* --- SVG hazard badge (reliable across devices) --- */
+function HazardBadge(){
+  return (
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" style={{position:"absolute", top:-6, left:"50%", transform:"translateX(-50%)"}}>
+      <path d="M12 2 1 21h22L12 2z" fill="#F59E0B" stroke="#B45309" strokeWidth="1"/>
+      <rect x="11" y="8" width="2" height="7" rx="1" fill="#111827"/>
+      <rect x="11" y="17" width="2" height="2" rx="1" fill="#111827"/>
+    </svg>
+  );
+}
+
+/* --- App --- */
 export default function App(){
   const [screen, setScreen] = useState("home"); // home | game
   const [mode, setMode] = useState("ai");       // ai | 2p
   const [seedDaily, setSeedDaily] = useState(false);
 
-  // capture navigation from header title
   useEffect(()=>{
     const h = (e)=> setScreen(e.detail?.to || "home");
     addEventListener("mm4:navigate", h);
@@ -207,26 +200,6 @@ export default function App(){
 }
 
 function Home({onPlayAI,onPlay2P,onDaily}){
-  // PWA install prompt
-  const [canInstall, setCanInstall] = useState(false);
-  const deferredRef = useRef(null);
-  useEffect(()=>{
-    const onBIP = (e)=>{
-      e.preventDefault();
-      deferredRef.current = e;
-      setCanInstall(true);
-    };
-    window.addEventListener('beforeinstallprompt', onBIP);
-    return ()=> window.removeEventListener('beforeinstallprompt', onBIP);
-  },[]);
-  const clickInstall = async ()=>{
-    const e = deferredRef.current;
-    if (!e) return;
-    setCanInstall(false);
-    await e.prompt();
-    deferredRef.current = null;
-  };
-
   return (
     <div className="card" style={{margin:"0 auto", maxWidth:520}}>
       <h2 style={{margin:"0 0 10px", textAlign:"center"}}>Welcome</h2>
@@ -238,11 +211,6 @@ function Home({onPlayAI,onPlay2P,onDaily}){
         <button className="big-btn p2" onClick={onPlay2P}>Local Multiplayer</button>
         <button className="big-btn daily" onClick={onDaily}>Daily Puzzle</button>
       </div>
-      {canInstall && (
-        <div style={{marginTop:10, textAlign:"center"}}>
-          <button className="big-btn" onClick={clickInstall}>Install App (PWA)</button>
-        </div>
-      )}
       <ul className="tiny" style={{margin:"8px 0 0", paddingLeft:"18px"}}>
         <li>Yellow = You, Red = AI</li>
         <li>AI adapts to your play. Winning increases its search depth.</li>
@@ -254,15 +222,19 @@ function Home({onPlayAI,onPlay2P,onDaily}){
 
 function Game({mode, seedDaily, onBack}){
   const [board, setBoard] = useState(()=> emptyBoard());
-  const [turn, setTurn] = useState(1);                // 1=You/P1, -1=AI/P2
-  const [end, setEnd] = useState(null);               // "player_win" | "ai_win" | "draw"
+  const [turn, setTurn] = useState(1);
+  const [end, setEnd] = useState(null);
   const [winLine, setWinLine] = useState(null);
   const [talk, setTalk] = useState("");
-  const [aiExplain, setAiExplain] = useState("");     // brief reason under status
-  const [focusCol, setFocusCol] = useState(3);        // keyboard focus col
-  const [cautionCols, setCautionCols] = useState([]); // edge danger indicators
+  const [aiExplain, setAiExplain] = useState("");
+  const [focusCol, setFocusCol] = useState(3);
+  const [cautionCols, setCautionCols] = useState([]);
 
-  // AI-only stats
+  // === NEW: difficulty level ===
+  const [level, setLevel] = useState(()=> localStorage.getItem("mm4_level") || "Auto"); // Auto | Easy | Medium | Hard | Expert
+  const setLevelPersist = (v)=>{ setLevel(v); localStorage.setItem("mm4_level", v); };
+
+  // AI-only stats (unchanged)
   const [stats, setStats] = useState(()=> JSON.parse(localStorage.getItem("mm4_stats")||`{"games":0,"wins":0,"losses":0,"draws":0,"streak":0}`));
   const record = (outcomeKey)=>{
     if (mode!=="ai") return;
@@ -279,20 +251,17 @@ function Game({mode, seedDaily, onBack}){
   const startRef = useRef(Date.now());
   const lastSaved = useRef("");
 
-  /* ---- Auto-resume from localStorage ---- */
+  // Auto-resume
   useEffect(()=>{
     const raw = localStorage.getItem("mm4_autosave");
     if (!raw) return;
     try{
-      const {b,t,m,e} = JSON.parse(raw);
+      const {b,t} = JSON.parse(raw);
       if (b && Array.isArray(b) && b.length===COLS){
         setBoard(b); setTurn(t??1); setWinLine(null); setTalk(""); setAiExplain("");
-        // keep mode if matches
-        if (m && (m==="ai"||m==="2p")) {/* ignore to avoid switching */ }
       }
     }catch{}
   }, []);
-  // persist on changes
   useEffect(()=>{
     const snap = JSON.stringify({b:board,t:turn,m:mode,e:end});
     if (snap!==lastSaved.current){
@@ -301,7 +270,7 @@ function Game({mode, seedDaily, onBack}){
     }
   }, [board, turn, mode, end]);
 
-  /* ---- Seed Daily ---- */
+  // Daily seed
   useEffect(()=>{
     if (seedDaily && window.MindMatchAI?.todaySeed){
       setBoard(window.MindMatchAI.todaySeed());
@@ -309,7 +278,7 @@ function Game({mode, seedDaily, onBack}){
     // eslint-disable-next-line
   }, []);
 
-  /* ---- Expose to plugin + hint hooks ---- */
+  // expose to plugin + hint hooks
   useEffect(()=>{
     window.board = board;
     window.turn = turn;
@@ -326,11 +295,10 @@ function Game({mode, seedDaily, onBack}){
         if (el){ el.classList.add('hint-col'); setTimeout(()=> el.classList.remove('hint-col'), 1500); }
       });
     };
-    // Give the plugin access to our local hints if it wants
     window.computeHints = window.computeHints || ((b,p)=>computeLocalHints(b,p));
   }, [board, turn, mode]);
 
-  /* ---- Smarter Hint: plugin preferred, else local --- */
+  // Hint button
   useEffect(()=>{
     const btn = document.getElementById("btnHint");
     if (!btn || mode!=="ai") return;
@@ -345,7 +313,7 @@ function Game({mode, seedDaily, onBack}){
     return ()=> btn.removeEventListener("click", handler);
   }, [board, mode]);
 
-  /* ---- Keyboard navigation & ARIA ---- */
+  // Keyboard
   const boardRef = useRef(null);
   useEffect(()=>{
     const el = boardRef.current;
@@ -364,14 +332,13 @@ function Game({mode, seedDaily, onBack}){
     return ()=> el.removeEventListener("keydown", onKey);
   }, [end, mode, turn, focusCol]);
 
-  /* ---- Edge danger badges (avoid losing next) ---- */
+  // Edge danger (now SVG badge)
   useEffect(()=>{
     const opp = -turn;
     const danger = [];
     [0,6].forEach(c=>{
       if (!canPlay(board,c)) return;
       const nb = play(board,c, turn);
-      // If opponent has any immediate winning reply, caution
       for (let oc=0; oc<COLS; oc++){
         if (!canPlay(nb,oc)) continue;
         if (Engine.winner(play(nb,oc,opp))===opp){ danger.push(c); break; }
@@ -380,31 +347,38 @@ function Game({mode, seedDaily, onBack}){
     setCautionCols(danger);
   }, [board, turn]);
 
-  /* ---- AI move (adaptive): if plugin doesn't move, fallback locally ---- */
+  // === AI Move (plugin then fallback) with Level override ===
   useEffect(()=>{
-    if (mode!=="ai") return;
-    if (end || turn!==-1) return;
+    if (mode!=="ai" || end || turn!==-1) return;
     const timer = setTimeout(()=>{
-      // If still AI turn, choose locally
       if (end || turn!==-1) return;
-      const difficulty = Math.min(5, Math.max(1, Math.floor((stats.wins - stats.losses)/3) + 2)); // adaptive from stats
+
+      // 1) Determine difficulty
+      let diff; // 1..5
+      if (level !== "Auto"){
+        diff = {Easy:1, Medium:3, Hard:4, Expert:5}[level] || 3;
+      } else {
+        diff = Math.min(5, Math.max(1, Math.floor((stats.wins - stats.losses)/3) + 2));
+      }
+
+      // 2) Choose move
       let chosen, note;
-      if (difficulty<=2){
+      if (diff<=2){
         const h = computeLocalHints(board, -1);
         chosen = (h.best && h.best[0] != null) ? h.best[0] : [3,2,4,1,5,0,6].find(c=>canPlay(board,c));
         note = h.note || "Heuristic";
       } else {
-        const iters = 120 + difficulty*120; // scale iterations
+        const iters = 120 + diff*150; // scale with level
         const m = mctsPick(board, -1, iters);
         chosen = m.col; note = m.note;
       }
       setAiExplain(note || "");
       if (typeof chosen === "number") place(chosen, -1);
-    }, 700); // give plugin ~700ms first
+    }, 700);
     return ()=> clearTimeout(timer);
-  }, [mode, turn, end, board, stats]);
+  }, [mode, turn, end, board, stats, level]);
 
-  /* ---- Onboarding pulse once ---- */
+  // Onboarding pulse once
   useEffect(()=>{
     const key = "mm4_seen_onboarding";
     if (localStorage.getItem(key)) return;
@@ -473,13 +447,11 @@ function Game({mode, seedDaily, onBack}){
     }catch{}
   }
 
-  // readable AI explanation for UI
   function explainForMove(b, p, c){
     const r = reasonFor(b, p, c);
     return r ? r.note : "";
   }
 
-  /* ----- Render ----- */
   return (
     <>
       {/* Controls */}
@@ -487,6 +459,25 @@ function Game({mode, seedDaily, onBack}){
         <button onClick={onBack}>Home</button>
         <button onClick={reset}>Reset</button>
         {mode==="ai" && <button id="btnHint">Hint</button>}
+
+        {/* NEW: Level picker (AI only) */}
+        {mode==="ai" && (
+          <label className="tiny" style={{display:"inline-flex", alignItems:"center", gap:6}}>
+            Level
+            <select
+              value={level}
+              onChange={(e)=> setLevelPersist(e.target.value)}
+              aria-label="AI difficulty"
+              style={{padding:"6px 8px", borderRadius:8}}
+            >
+              <option>Auto</option>
+              <option>Easy</option>
+              <option>Medium</option>
+              <option>Hard</option>
+              <option>Expert</option>
+            </select>
+          </label>
+        )}
       </div>
 
       <p className="tiny" role="status" aria-live="polite" style={{textAlign:"center", margin:"4px 0 2px"}}>
@@ -499,7 +490,6 @@ function Game({mode, seedDaily, onBack}){
       )}
 
       <div className="board-wrap">
-        {/* A11y: the board itself is focusable for keyboard play */}
         <div
           className="board"
           role="grid"
@@ -522,12 +512,11 @@ function Game({mode, seedDaily, onBack}){
                 onMouseEnter={()=> setFocusCol(c)}
                 onClick={()=> (mode==="ai" ? (turn===1 && window.dropPiece(c)) : window.dropPiece(c))}
                 title={caution ? "Careful: edge here can enable opponent reply" : ""}
-                style={isFocused ? {outline:"2px solid var(--blue)", outlineOffset:"2px", borderRadius:12} : null}
+                style={isFocused ? {outline:"2px solid var(--blue)", outlineOffset:"2px", borderRadius:12, position:"relative"} : {position:"relative"}}
               >
-                {/* small caution badge */}
-                {caution && (
-                  <div aria-hidden="true" style={{position:"absolute", top:-6, left:"50%", transform:"translateX(-50%)", fontSize:12, color:"#ef4444"}}>⚠</div>
-                )}
+                {/* Reliable hazard badge (SVG) instead of emoji */}
+                {caution && <HazardBadge />}
+
                 {Array.from({length: ROWS}).map((_, rr) => {
                   const r = ROWS-1-rr;
                   const v = (board[c][r] ?? 0);
@@ -553,7 +542,7 @@ function Game({mode, seedDaily, onBack}){
         {!!winLine && <WinOverlay line={winLine} />}
       </div>
 
-      {/* AI-only stats (updated only in AI games) */}
+      {/* AI-only stats */}
       <div className="stats">
         <div>📊 Games: <b>{stats.games}</b> · ✅ Wins: <b>{stats.wins}</b> · ❌ Losses: <b>{stats.losses}</b> · 🤝 Draws: <b>{stats.draws}</b> · 🔥 Streak: <b>{stats.streak}</b></div>
         <div style={{marginTop:"6px"}}>
@@ -588,7 +577,6 @@ function Game({mode, seedDaily, onBack}){
 }
 
 function WinOverlay({line}){
-  // line = [{r,c}...], r=0..5 top->bottom, c=0..6 left->right
   const gap = 10;
   const cell = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--cell")) || 56;
   const pad=8;
