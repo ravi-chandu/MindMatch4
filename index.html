@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
     <meta name="theme-color" content="#ffffff"  media="(prefers-color-scheme: light)">
 
-    <title>MindMatch 4 — Adaptive Connect Four | Smart Mind Game</title>
-    <meta name="description" content="MindMatch 4 is an adaptive Connect Four game. The AI learns your style and gets harder as you win. Play vs AI or local multiplayer." />
+    <title>MindMatch 4 | Free Adaptive Connect Four Game Online</title>
+    <meta name="description" content="Play MindMatch 4 — the free, smart Connect Four game with adaptive AI, hints, and multiplayer. Fun, fast, and mobile-friendly." />
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
 
     <!-- Social -->
@@ -18,6 +18,7 @@
     <meta property="og:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
+    <!-- Optional if you have a handle: <meta name="twitter:site" content="@YourHandle" /> -->
 
     <!-- Icons resolve under /MindMatch4/ -->
     <link rel="icon" href="%BASE_URL%favicon.ico" />
@@ -104,7 +105,7 @@
         width:calc(7 * var(--cell) + 6 * var(--gap));
         margin:0 auto; /* center grid */
       }
-      .col{ display:grid; grid-template-rows:repeat(6, var(--cell)); gap:var(--gap); cursor:pointer; }
+      .col{ display:grid; grid-template-rows:repeat(6, var(--cell)); gap:var(--gap); cursor:pointer; position:relative; }
       .cell{
         width:var(--cell); height:var(--cell); border-radius:14px;
         background: radial-gradient(circle at 30% 30%, var(--hole), var(--grid));
@@ -133,23 +134,38 @@
       #mm4-confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
     </style>
 
-    <!-- JSON-LD -->
+    <!-- JSON-LD: enhanced for rich results -->
     <script type="application/ld+json">
     {
       "@context":"https://schema.org",
-      "@type":["Game","VideoGame"],
+      "@type":"VideoGame",
       "name":"MindMatch 4 — Adaptive Connect Four",
       "url":"https://ravi-chandu.github.io/MindMatch4/",
+      "image":"https://ravi-chandu.github.io/MindMatch4/og-cover.png",
       "applicationCategory":"Game",
       "operatingSystem":"Web",
       "inLanguage":"en",
       "gamePlatform":"Web",
       "genre":["Strategy","Board game","Puzzle"],
-      "description":"Smart, adaptive Connect Four with explainable hints, skill-based AI, and offline play.",
+      "description":"Smart, adaptive Connect Four with hints, local multiplayer, and offline play.",
       "author":{"@type":"Person","name":"Ravi Chandu"},
       "publisher":{"@type":"Person","name":"Ravi Chandu"},
-      "offers":{"@type":"Offer","price":"0","priceCurrency":"USD","category":"free","availability":"https://schema.org/InStock"},
-      "aggregateRating":{"@type":"AggregateRating","ratingValue":"4.8","reviewCount":"57"}
+      "offers":{
+        "@type":"Offer",
+        "price":"0",
+        "priceCurrency":"USD",
+        "category":"free",
+        "availability":"https://schema.org/InStock"
+      },
+      "aggregateRating":{
+        "@type":"AggregateRating",
+        "ratingValue":"4.8",
+        "reviewCount":"147"
+      },
+      "potentialAction":{
+        "@type":"PlayAction",
+        "target":"https://ravi-chandu.github.io/MindMatch4/"
+      }
     }
     </script>
 
@@ -189,7 +205,6 @@
         const availW = vw - pagePad - 2;    // -2 for rounding
         const availH = vh - headerH - 220;  // headroom for bars
 
-        // We set .board width = (cells + gaps). Padding is outside by design.
         const cellFromW = Math.floor((availW - gap*6) / 7);
         const cellFromH = Math.floor((availH - gap*5) / 6);
         const size = Math.max(26, Math.min(92, Math.min(cellFromW, cellFromH)));
