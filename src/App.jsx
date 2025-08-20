@@ -7,8 +7,9 @@ const clampCol = (c)=> Math.max(0, Math.min(COLS-1, c));
 const canPlay = (b,c)=> (b[c]?.length||0) < ROWS;
 const clone = (b)=> b.map(col=>col.slice());
 const play = (b,c,p)=>{ const nb = clone(b); nb[c] = (nb[c]||[]).concat(p); return nb; };
+const totalPieces = (b)=> b.reduce((s,col)=> s + (col?.length||0), 0);
 
-/* --- threat counter for hints/scoring --- */
+/* ---------- Threat count (for hints) ---------- */
 function nearWinScore(board, player=1){
   const at = (r,c)=> (r<0||r>=ROWS||c<0||c>=COLS) ? -99 : ((board[c][ROWS-1-r] ?? 0));
   let score=0;
@@ -26,7 +27,7 @@ function nearWinScore(board, player=1){
   return score;
 }
 
-/* --- win/lose/draw quips --- */
+/* ---------- Endgame chatter ---------- */
 function engageMessage(outcome, {ms=0, near=0}={}){
   const quick = ms<45000, long = ms>180000;
   const close = near>=1, veryClose = near>=2;
@@ -47,7 +48,7 @@ function engageMessage(outcome, {ms=0, near=0}={}){
   return pick(DRAW);
 }
 
-/* --- confetti --- */
+/* ---------- Confetti ---------- */
 function fireConfetti(canvas){
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -67,7 +68,7 @@ function fireConfetti(canvas){
   setTimeout(()=>{ clearInterval(id); ctx.clearRect(0,0,W,H); },1800);
 }
 
-/* --- share --- */
+/* ---------- Share ---------- */
 function shareText(board, outcome){
   const map = { "-1":"🔴", "1":"🟡", "0":"⚫" };
   let rows = [];
@@ -83,7 +84,7 @@ function shareText(board, outcome){
   return `${head}${rows.join("\n")}\nhttps://ravi-chandu.github.io/MindMatch4/`;
 }
 
-/* --- Hints with reasons --- */
+/* ---------- Hints with reasons ---------- */
 const CENTER_PREF = [3,4,5,6,5,4,3];
 function reasonFor(board, player, col){
   if (!canPlay(board,col)) return null;
@@ -122,7 +123,7 @@ function computeLocalHints(board, player=1){
   return { best: top.map(s=>s.c), note:"Best by heuristic", reasons: top.map(s=>s.reason) };
 }
 
-/* --- lightweight MCTS rollouts for AI fallback --- */
+/* ---------- Lightweight MCTS ---------- */
 function randomHeuristicMove(b, p){
   const cand=[]; for(let c=0;c<COLS;c++) if (canPlay(b,c)) cand.push(c);
   if (!cand.length) return -1;
@@ -162,10 +163,11 @@ function mctsPick(board, player, iters=200){
   return { col: best, note: "Monte‑Carlo rollout" };
 }
 
-/* --- SVG hazard badge (reliable across devices) --- */
+/* ---------- SVG hazard badge (always visible) ---------- */
 function HazardBadge(){
   return (
-    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" style={{position:"absolute", top:-6, left:"50%", transform:"translateX(-50%)"}}>
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24"
+      style={{position:"absolute", top:-10, left:"50%", transform:"translateX(-50%)", zIndex:3, pointerEvents:"none"}}>
       <path d="M12 2 1 21h22L12 2z" fill="#F59E0B" stroke="#B45309" strokeWidth="1"/>
       <rect x="11" y="8" width="2" height="7" rx="1" fill="#111827"/>
       <rect x="11" y="17" width="2" height="2" rx="1" fill="#111827"/>
@@ -173,7 +175,7 @@ function HazardBadge(){
   );
 }
 
-/* --- App --- */
+/* ---------- App ---------- */
 export default function App(){
   const [screen, setScreen] = useState("home"); // home | game
   const [mode, setMode] = useState("ai");       // ai | 2p
@@ -230,11 +232,17 @@ function Game({mode, seedDaily, onBack}){
   const [focusCol, setFocusCol] = useState(3);
   const [cautionCols, setCautionCols] = useState([]);
 
-  // === NEW: difficulty level ===
-  const [level, setLevel] = useState(()=> localStorage.getItem("mm4_level") || "Auto"); // Auto | Easy | Medium | Hard | Expert
+  // Difficulty UI + lock after first move
+  const [level, setLevel] = useState(()=> localStorage.getItem("mm4_level") || "Auto"); // UI choice
+  const lockedLevelRef = useRef(level); // snapshot used by AI
+  const moves = totalPieces(board);
+  useEffect(()=>{
+    if (moves===0) lockedLevelRef.current = level; // update snapshot until first move
+  }, [level, moves]);
+
   const setLevelPersist = (v)=>{ setLevel(v); localStorage.setItem("mm4_level", v); };
 
-  // AI-only stats (unchanged)
+  // AI-only stats
   const [stats, setStats] = useState(()=> JSON.parse(localStorage.getItem("mm4_stats")||`{"games":0,"wins":0,"losses":0,"draws":0,"streak":0}`));
   const record = (outcomeKey)=>{
     if (mode!=="ai") return;
@@ -278,7 +286,7 @@ function Game({mode, seedDaily, onBack}){
     // eslint-disable-next-line
   }, []);
 
-  // expose to plugin + hint hooks
+  // expose to plugin + hints + app bridge
   useEffect(()=>{
     window.board = board;
     window.turn = turn;
@@ -332,7 +340,7 @@ function Game({mode, seedDaily, onBack}){
     return ()=> el.removeEventListener("keydown", onKey);
   }, [end, mode, turn, focusCol]);
 
-  // Edge danger (now SVG badge)
+  // Edge danger computation
   useEffect(()=>{
     const opp = -turn;
     const danger = [];
@@ -347,36 +355,52 @@ function Game({mode, seedDaily, onBack}){
     setCautionCols(danger);
   }, [board, turn]);
 
-  // === AI Move (plugin then fallback) with Level override ===
+  /* ---------- AI Move (respects locked difficulty) ---------- */
   useEffect(()=>{
     if (mode!=="ai" || end || turn!==-1) return;
+
     const timer = setTimeout(()=>{
       if (end || turn!==-1) return;
 
-      // 1) Determine difficulty
-      let diff; // 1..5
-      if (level !== "Auto"){
-        diff = {Easy:1, Medium:3, Hard:4, Expert:5}[level] || 3;
+      // decide difficulty ONCE per game (locked after first move)
+      const uiLevel = lockedLevelRef.current; // "Auto" | Easy | Medium | Hard | Expert
+
+      // convert to internal diff 1..5
+      let diff;
+      if (uiLevel !== "Auto"){
+        diff = {Easy:1, Medium:3, Hard:4, Expert:5}[uiLevel] || 3;
       } else {
         diff = Math.min(5, Math.max(1, Math.floor((stats.wins - stats.losses)/3) + 2));
       }
 
-      // 2) Choose move
+      // choose move using diff
       let chosen, note;
+
       if (diff<=2){
+        // Heuristic mode; Easy adds randomness and weaker safety
         const h = computeLocalHints(board, -1);
-        chosen = (h.best && h.best[0] != null) ? h.best[0] : [3,2,4,1,5,0,6].find(c=>canPlay(board,c));
-        note = h.note || "Heuristic";
+        const candidates = h.best?.length ? h.best.slice() : [3,2,4,1,5,0,6].filter(c=>canPlay(board,c));
+        if (uiLevel==="Easy"){
+          // random among top or center-ish, do NOT check suicide strictly
+          chosen = candidates[Math.floor(Math.random()*Math.max(1,candidates.length))] ?? 3;
+          note = "Simple heuristic (Easy)";
+        } else {
+          // Medium: pick best[0], still heuristic (with suicide check baked in)
+          chosen = (candidates && candidates[0] != null) ? candidates[0] : [3,2,4,1,5,0,6].find(c=>canPlay(board,c));
+          note = "Heuristic (Medium)";
+        }
       } else {
-        const iters = 120 + diff*150; // scale with level
+        // Hard/Expert: MCTS with higher iters
+        const iters = (uiLevel==="Expert") ? 1000 : 600;
         const m = mctsPick(board, -1, iters);
-        chosen = m.col; note = m.note;
+        chosen = m.col; note = `Monte‑Carlo rollout (${iters})`;
       }
+
       setAiExplain(note || "");
       if (typeof chosen === "number") place(chosen, -1);
-    }, 700);
+    }, 650); // plugin gets a short window; our AI then acts
     return ()=> clearTimeout(timer);
-  }, [mode, turn, end, board, stats, level]);
+  }, [mode, turn, end, board, stats]);
 
   // Onboarding pulse once
   useEffect(()=>{
@@ -460,7 +484,7 @@ function Game({mode, seedDaily, onBack}){
         <button onClick={reset}>Reset</button>
         {mode==="ai" && <button id="btnHint">Hint</button>}
 
-        {/* NEW: Level picker (AI only) */}
+        {/* Difficulty picker (AI only). Disabled after first move. */}
         {mode==="ai" && (
           <label className="tiny" style={{display:"inline-flex", alignItems:"center", gap:6}}>
             Level
@@ -468,6 +492,7 @@ function Game({mode, seedDaily, onBack}){
               value={level}
               onChange={(e)=> setLevelPersist(e.target.value)}
               aria-label="AI difficulty"
+              disabled={totalPieces(board) > 0}
               style={{padding:"6px 8px", borderRadius:8}}
             >
               <option>Auto</option>
@@ -480,10 +505,17 @@ function Game({mode, seedDaily, onBack}){
         )}
       </div>
 
+      {/* Show chosen difficulty ONLY before first move */}
+      {mode==="ai" && totalPieces(board)===0 && (
+        <p className="tiny" style={{textAlign:"center", margin:"0 0 6px", opacity:.9}}>
+          AI Level: <b>{lockedLevelRef.current}</b>
+        </p>
+      )}
+
       <p className="tiny" role="status" aria-live="polite" style={{textAlign:"center", margin:"4px 0 2px"}}>
         {statusText}
       </p>
-      {aiExplain && turn===1 && !end && (
+      {aiExplain && turn===1 && !end && totalPieces(board)>0 && (
         <p className="tiny" style={{textAlign:"center", margin:"0 0 6px", opacity:.9}}>
           AI played that because: <em>{aiExplain}</em>
         </p>
@@ -512,9 +544,12 @@ function Game({mode, seedDaily, onBack}){
                 onMouseEnter={()=> setFocusCol(c)}
                 onClick={()=> (mode==="ai" ? (turn===1 && window.dropPiece(c)) : window.dropPiece(c))}
                 title={caution ? "Careful: edge here can enable opponent reply" : ""}
-                style={isFocused ? {outline:"2px solid var(--blue)", outlineOffset:"2px", borderRadius:12, position:"relative"} : {position:"relative"}}
+                style={{
+                  position:"relative",
+                  ...(isFocused ? {outline:"2px solid var(--blue)", outlineOffset:"2px", borderRadius:12} : null)
+                }}
               >
-                {/* Reliable hazard badge (SVG) instead of emoji */}
+                {/* Top‑center hazard badge (above discs) */}
                 {caution && <HazardBadge />}
 
                 {Array.from({length: ROWS}).map((_, rr) => {
@@ -530,6 +565,7 @@ function Game({mode, seedDaily, onBack}){
                       aria-colindex={c+1}
                       aria-rowindex={rr+1}
                       aria-label={v===1 ? "Yellow" : v===-1 ? "Red" : "Empty"}
+                      style={{position:"relative", zIndex:1}}
                     >
                       {v!==0 && <span className={`disc ${fill}`} />}
                     </div>
