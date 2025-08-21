@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as Engine from "../ai/engine.js";
+import Modal from "./Modal.jsx";
 
 const ROWS = 6, COLS = 7;
 const emptyBoard = () => Array.from({length: COLS}, () => []);
@@ -231,6 +232,7 @@ function Game({mode, seedDaily, onBack}){
   const [aiExplain, setAiExplain] = useState("");
   const [focusCol, setFocusCol] = useState(3);
   const [cautionCols, setCautionCols] = useState([]);
+  const statusRef = useRef(null);
 
   // Difficulty UI + lock after first move
   const [level, setLevel] = useState(()=> localStorage.getItem("mm4_level") || "Auto"); // UI choice
@@ -417,6 +419,12 @@ function Game({mode, seedDaily, onBack}){
         : (end==="player_win" ? "P1 wins!" : end==="ai_win" ? "P2 wins!" : "Draw"))
     : (turn===1 ? (mode==="ai"?"Your move (Yellow)":"P1 move (Yellow)") : (mode==="ai"?"AI is thinking…":"P2 move (Red)"));
 
+  useEffect(() => {
+    if (statusRef.current) {
+      statusRef.current.textContent = `${statusText}${talk ? ` — ${talk}` : ""}`;
+    }
+  }, [statusText, talk]);
+
   function place(col, who){
     if (end) return false;
     const c = clampCol(col);
@@ -480,9 +488,9 @@ function Game({mode, seedDaily, onBack}){
     <>
       {/* Controls */}
       <div className="modebar">
-        <button onClick={onBack}>Home</button>
-        <button onClick={reset}>Reset</button>
-        {mode==="ai" && <button id="btnHint">Hint</button>}
+        <button onClick={onBack} aria-label="Return to home screen">Home</button>
+        <button onClick={reset} aria-label="Reset the game">Reset</button>
+        {mode==="ai" && <button id="btnHint" aria-label="Get a hint">Hint</button>}
 
         {/* Difficulty picker (AI only). Disabled after first move. */}
         {mode==="ai" && (
@@ -515,6 +523,7 @@ function Game({mode, seedDaily, onBack}){
       <p className="tiny" role="status" aria-live="polite" style={{textAlign:"center", margin:"4px 0 2px"}}>
         {statusText}
       </p>
+      <div ref={statusRef} aria-live="polite" className="sr-only"></div>
       {aiExplain && turn===1 && !end && totalPieces(board)>0 && (
         <p className="tiny" style={{textAlign:"center", margin:"0 0 6px", opacity:.9}}>
           AI played that because: <em>{aiExplain}</em>
@@ -541,6 +550,7 @@ function Game({mode, seedDaily, onBack}){
                 data-col={c}
                 role="columnheader"
                 aria-colindex={c+1}
+                aria-label={`Drop in column ${c+1}`}
                 onMouseEnter={()=> setFocusCol(c)}
                 onClick={()=> (mode==="ai" ? (turn===1 && window.dropPiece(c)) : window.dropPiece(c))}
                 title={caution ? "Careful: edge here can enable opponent reply" : ""}
@@ -585,28 +595,26 @@ function Game({mode, seedDaily, onBack}){
           <button onClick={reset} style={{marginRight:8}}>Rematch</button>
           {mode==="ai" && <button onClick={()=>{ reset(); setTurn(-1); window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:-1}})); }}>AI first move</button>}
           <button onClick={resetStats} style={{marginLeft:8}}>Reset stats</button>
-          <button onClick={share} style={{marginLeft:8}}>Share</button>
+          <button onClick={share} style={{marginLeft:8}} aria-label="Share results">Share</button>
         </div>
       </div>
 
       {/* Result modal */}
       {end && (
-        <div className="modal" role="dialog" aria-modal="true">
-          <div className="dialog">
-            <h2>
-              {mode==="ai"
-                ? (end==="player_win"?"🎉 You win!":end==="ai_win"?"🤖 AI wins":"🤝 Draw")
-                : (end==="player_win"?"🟡 P1 wins!":end==="ai_win"?"🔴 P2 wins!":"🤝 Draw")}
-            </h2>
-            <p style={{opacity:.9}}>{talk}</p>
-            <div className="actions">
-              <button onClick={reset}>Play again</button>
-              <button onClick={share}>Share</button>
-              {mode==="ai" && <button onClick={()=>{ reset(); setTurn(-1); window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:-1}})); }}>AI first move</button>}
-              <button onClick={onBack}>Home</button>
-            </div>
+        <Modal onClose={reset}>
+          <h2>
+            {mode==="ai"
+              ? (end==="player_win"?"🎉 You win!":end==="ai_win"?"🤖 AI wins":"🤝 Draw")
+              : (end==="player_win"?"🟡 P1 wins!":end==="ai_win"?"🔴 P2 wins!":"🤝 Draw")}
+          </h2>
+          <p style={{opacity:.9}}>{talk}</p>
+          <div className="actions">
+            <button onClick={reset}>Play again</button>
+            <button onClick={share} aria-label="Share results">Share</button>
+            {mode==="ai" && <button onClick={()=>{ reset(); setTurn(-1); window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:-1}})); }}>AI first move</button>}
+            <button onClick={onBack} aria-label="Return to home screen">Home</button>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   );
