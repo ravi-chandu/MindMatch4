@@ -5,6 +5,11 @@
   max-width: min(calc(7 * var(--cell) + 6 * var(--gap) + 32px), 100vw);
 }
 
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
 /* Top bar (in App Home/Game) */
 .topbar{
   display:flex; align-items:center; justify-content:space-between;
