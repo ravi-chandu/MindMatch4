@@ -231,6 +231,8 @@ function Game({mode, seedDaily, onBack}){
   const [aiExplain, setAiExplain] = useState("");
   const [focusCol, setFocusCol] = useState(3);
   const [cautionCols, setCautionCols] = useState([]);
+  const workerRef = useRef(null);
+  const placeRef = useRef(null);
 
   // Difficulty UI + lock after first move
   const [level, setLevel] = useState(()=> localStorage.getItem("mm4_level") || "Auto"); // UI choice
@@ -355,52 +357,38 @@ function Game({mode, seedDaily, onBack}){
     setCautionCols(danger);
   }, [board, turn]);
 
-  /* ---------- AI Move (respects locked difficulty) ---------- */
-  useEffect(()=>{
-    if (mode!=="ai" || end || turn!==-1) return;
+  /* ---------- AI Move via worker ---------- */
+  useEffect(() => {
+    placeRef.current = place;
+  });
 
-    const timer = setTimeout(()=>{
-      if (end || turn!==-1) return;
-
-      // decide difficulty ONCE per game (locked after first move)
-      const uiLevel = lockedLevelRef.current; // "Auto" | Easy | Medium | Hard | Expert
-
-      // convert to internal diff 1..5
-      let diff;
-      if (uiLevel !== "Auto"){
-        diff = {Easy:1, Medium:3, Hard:4, Expert:5}[uiLevel] || 3;
-      } else {
-        diff = Math.min(5, Math.max(1, Math.floor((stats.wins - stats.losses)/3) + 2));
+  useEffect(() => {
+    if (end) {
+      workerRef.current?.terminate();
+      workerRef.current = null;
+      return;
+    }
+    const w = new Worker(new URL('./workers/aiWorker.js', import.meta.url), { type: 'module' });
+    workerRef.current = w;
+    w.onmessage = (e) => {
+      const col = e.data?.col ?? e.data;
+      if (typeof col === 'number') {
+        placeRef.current?.(col, -1);
       }
+    };
+    return () => {
+      w.terminate();
+      workerRef.current = null;
+    };
+  }, [end]);
 
-      // choose move using diff
-      let chosen, note;
-
-      if (diff<=2){
-        // Heuristic mode; Easy adds randomness and weaker safety
-        const h = computeLocalHints(board, -1);
-        const candidates = h.best?.length ? h.best.slice() : [3,2,4,1,5,0,6].filter(c=>canPlay(board,c));
-        if (uiLevel==="Easy"){
-          // random among top or center-ish, do NOT check suicide strictly
-          chosen = candidates[Math.floor(Math.random()*Math.max(1,candidates.length))] ?? 3;
-          note = "Simple heuristic (Easy)";
-        } else {
-          // Medium: pick best[0], still heuristic (with suicide check baked in)
-          chosen = (candidates && candidates[0] != null) ? candidates[0] : [3,2,4,1,5,0,6].find(c=>canPlay(board,c));
-          note = "Heuristic (Medium)";
-        }
-      } else {
-        // Hard/Expert: MCTS with higher iters
-        const iters = (uiLevel==="Expert") ? 1000 : 600;
-        const m = mctsPick(board, -1, iters);
-        chosen = m.col; note = `Monte‑Carlo rollout (${iters})`;
-      }
-
-      setAiExplain(note || "");
-      if (typeof chosen === "number") place(chosen, -1);
-    }, 650); // plugin gets a short window; our AI then acts
-    return ()=> clearTimeout(timer);
-  }, [mode, turn, end, board, stats]);
+  useEffect(() => {
+    if (mode !== 'ai' || end || turn !== -1) return;
+    const id = setTimeout(() => {
+      workerRef.current?.postMessage({ board });
+    }, 650);
+    return () => clearTimeout(id);
+  }, [mode, turn, end, board]);
 
   // Onboarding pulse once
   useEffect(()=>{
