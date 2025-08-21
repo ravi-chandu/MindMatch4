@@ -180,6 +180,12 @@ export default function App(){
   const [screen, setScreen] = useState("home"); // home | game
   const [mode, setMode] = useState("ai");       // ai | 2p
   const [seedDaily, setSeedDaily] = useState(false);
+  const [patterned, setPatterned] = useState(() => localStorage.getItem("mm4_pattern") === "1");
+
+  const setPatternedPersist = (v) => {
+    setPatterned(v);
+    localStorage.setItem("mm4_pattern", v ? "1" : "0");
+  };
 
   useEffect(()=>{
     const h = (e)=> setScreen(e.detail?.to || "home");
@@ -194,14 +200,24 @@ export default function App(){
           onPlayAI={()=>{setMode("ai"); setSeedDaily(false); setScreen("game");}}
           onPlay2P={()=>{setMode("2p"); setSeedDaily(false); setScreen("game");}}
           onDaily={()=>{setMode("ai"); setSeedDaily(true); setScreen("game");}}
+          patterned={patterned}
+          setPatterned={setPatternedPersist}
         />
       )}
-      {screen==="game" && <Game mode={mode} seedDaily={seedDaily} onBack={()=>setScreen("home")} />}
+      {screen==="game" && (
+        <Game
+          mode={mode}
+          seedDaily={seedDaily}
+          onBack={()=>setScreen("home")}
+          patterned={patterned}
+          setPatterned={setPatternedPersist}
+        />
+      )}
     </div>
   );
 }
 
-function Home({onPlayAI,onPlay2P,onDaily}){
+function Home({onPlayAI,onPlay2P,onDaily, patterned, setPatterned}){
   return (
     <div className="card" style={{margin:"0 auto", maxWidth:520}}>
       <h2 style={{margin:"0 0 10px", textAlign:"center"}}>Welcome</h2>
@@ -218,11 +234,19 @@ function Home({onPlayAI,onPlay2P,onDaily}){
         <li>AI adapts to your play. Winning increases its search depth.</li>
         <li>Daily gives a fresh curated mid‑game each day.</li>
       </ul>
+      <label className="tiny" style={{display:"flex", alignItems:"center", gap:6, marginTop:8}}>
+        <input
+          type="checkbox"
+          checked={patterned}
+          onChange={(e)=> setPatterned(e.target.checked)}
+        />
+        Pattern discs
+      </label>
     </div>
   );
 }
 
-function Game({mode, seedDaily, onBack}){
+function Game({mode, seedDaily, onBack, patterned, setPatterned}){
   const [board, setBoard] = useState(()=> emptyBoard());
   const [turn, setTurn] = useState(1);
   const [end, setEnd] = useState(null);
@@ -503,6 +527,15 @@ function Game({mode, seedDaily, onBack}){
             </select>
           </label>
         )}
+
+        <label className="tiny" style={{display:"inline-flex", alignItems:"center", gap:6}}>
+          <input
+            type="checkbox"
+            checked={patterned}
+            onChange={(e)=> setPatterned(e.target.checked)}
+          />
+          Pattern discs
+        </label>
       </div>
 
       {/* Show chosen difficulty ONLY before first move */}
@@ -523,7 +556,7 @@ function Game({mode, seedDaily, onBack}){
 
       <div className="board-wrap">
         <div
-          className="board"
+          className={`board ${patterned ? "pattern-mode" : ""}`}
           role="grid"
           aria-label="Connect Four"
           aria-rowcount={ROWS}
@@ -575,7 +608,7 @@ function Game({mode, seedDaily, onBack}){
             );
           })}
         </div>
-        {!!winLine && <WinOverlay line={winLine} />}
+        {!!winLine && <WinOverlay line={winLine} patterned={patterned} />}
       </div>
 
       {/* AI-only stats */}
@@ -612,7 +645,7 @@ function Game({mode, seedDaily, onBack}){
   );
 }
 
-function WinOverlay({line}){
+function WinOverlay({line, patterned}){
   const gap = 10;
   const cell = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--cell")) || 56;
   const pad=8;
@@ -621,7 +654,7 @@ function WinOverlay({line}){
   const first = {X:x(line[0].c), Y:y(line[0].r)};
   const last  = {X:x(line[3].c), Y:y(line[3].r)};
   return (
-    <div className="win-overlay" aria-hidden="true">
+    <div className={`win-overlay ${patterned ? "pattern-mode" : ""}`} aria-hidden="true">
       <svg>
         <line x1={first.X} y1={first.Y} x2={last.X} y2={last.Y} stroke="gold" strokeWidth="6" strokeLinecap="round" />
       </svg>

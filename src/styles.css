@@ -66,6 +66,24 @@
 .disc.yellow{ background: radial-gradient(circle at 32% 28%, #ffe9a8, #fbbf24); border: 2px solid #d1a200; }
 .disc.red{    background: radial-gradient(circle at 32% 28%, #ff8a8a, #ef4444); border: 2px solid #b91c1c; }
 
+/* Pattern mode adds shapes to discs and helpers */
+.board.pattern-mode .disc.yellow{
+  background: repeating-linear-gradient(45deg, #ffe9a8 0 6px, #fbbf24 6px 12px);
+  border: 2px solid #d1a200;
+}
+.board.pattern-mode .disc.red{
+  background:
+    radial-gradient(circle, #ef4444 20%, transparent 21%) 0 0/8px 8px,
+    #ff8a8a;
+  border: 2px solid #b91c1c;
+}
+.board.pattern-mode .hint-col{
+  outline: 3px dashed var(--green);
+}
+.win-overlay.pattern-mode line{
+  stroke-dasharray: 6 4;
+}
+
 /* Winner overlay area is defined in index.html */
 
 /* Cards on Home */
