@@ -628,3 +628,5 @@ function WinOverlay({line}){
     </div>
   );
 }
+
+export { computeLocalHints, reasonFor };
