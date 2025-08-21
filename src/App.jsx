@@ -363,7 +363,7 @@ function Game({mode, seedDaily, onBack}){
   });
 
   useEffect(() => {
-    if (end) {
+    if (mode !== 'ai' || end) {
       workerRef.current?.terminate();
       workerRef.current = null;
       return;
@@ -380,7 +380,7 @@ function Game({mode, seedDaily, onBack}){
       w.terminate();
       workerRef.current = null;
     };
-  }, [end]);
+  }, [mode, end]);
 
   useEffect(() => {
     if (mode !== 'ai' || end || turn !== -1) return;
