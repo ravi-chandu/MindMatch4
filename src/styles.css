@@ -1,5 +1,9 @@
 /* Shell & header styles are in index.html (inline for faster paint). This file focuses on app-specific parts. */
 
+:root{
+  --cell: clamp(26px, calc((100vw - 24px - 6*var(--gap))/7), 92px);
+}
+
 .app{
   width: 100%;
   max-width: min(calc(7 * var(--cell) + 6 * var(--gap) + 32px), 100vw);
@@ -36,7 +40,7 @@
   border: 1px solid var(--panel-border);
   border-radius: 14px;
   box-shadow: var(--shadow);
-  width: min(calc(7 * var(--cell) + 6 * var(--gap)), calc(100vw - 24px));
+  width: calc(7 * var(--cell) + 6 * var(--gap));
   max-width: 100%;
 }
 
