@@ -23,7 +23,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // Register service worker
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/MindMatch4/sw.js");
+  const swUrl = new URL("sw.js", import.meta.env.BASE_URL).href;
+  navigator.serviceWorker.register(swUrl);
 }
 
 // Analytics hooks
