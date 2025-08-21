@@ -8,6 +8,15 @@ const canPlay = (b,c)=> (b[c]?.length||0) < ROWS;
 const clone = (b)=> b.map(col=>col.slice());
 const play = (b,c,p)=>{ const nb = clone(b); nb[c] = (nb[c]||[]).concat(p); return nb; };
 const totalPieces = (b)=> b.reduce((s,col)=> s + (col?.length||0), 0);
+const boardFromHistory = (moves, upto=moves.length)=>{
+  let b = emptyBoard();
+  let p = 1;
+  for(let i=0;i<upto;i++){
+    b = play(b, moves[i], p);
+    p = -p;
+  }
+  return b;
+};
 
 /* ---------- Threat count (for hints) ---------- */
 function nearWinScore(board, player=1){
@@ -231,6 +240,12 @@ function Game({mode, seedDaily, onBack}){
   const [aiExplain, setAiExplain] = useState("");
   const [focusCol, setFocusCol] = useState(3);
   const [cautionCols, setCautionCols] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [historyIdx, setHistoryIdx] = useState(0);
+  const [replaying, setReplaying] = useState(false);
+  const [replayIdx, setReplayIdx] = useState(0);
+  const [replayPlaying, setReplayPlaying] = useState(false);
+  const replayFinalRef = useRef(null);
 
   // Difficulty UI + lock after first move
   const [level, setLevel] = useState(()=> localStorage.getItem("mm4_level") || "Auto"); // UI choice
@@ -264,19 +279,24 @@ function Game({mode, seedDaily, onBack}){
     const raw = localStorage.getItem("mm4_autosave");
     if (!raw) return;
     try{
-      const {b,t} = JSON.parse(raw);
-      if (b && Array.isArray(b) && b.length===COLS){
-        setBoard(b); setTurn(t??1); setWinLine(null); setTalk(""); setAiExplain("");
+      const {b,t,h,i} = JSON.parse(raw);
+      if (Array.isArray(h)){
+        setHistory(h);
+        setHistoryIdx(i ?? h.length);
+        const bb = (b && Array.isArray(b) && b.length===COLS) ? b : boardFromHistory(h, i ?? h.length);
+        setBoard(bb);
+        setTurn(t ?? ((i ?? h.length) % 2 === 0 ? 1 : -1));
+        setWinLine(null); setTalk(""); setAiExplain("");
       }
     }catch{}
   }, []);
   useEffect(()=>{
-    const snap = JSON.stringify({b:board,t:turn,m:mode,e:end});
+    const snap = JSON.stringify({b:board,t:turn,m:mode,e:end,h:history,i:historyIdx});
     if (snap!==lastSaved.current){
       localStorage.setItem("mm4_autosave", snap);
       lastSaved.current = snap;
     }
-  }, [board, turn, mode, end]);
+  }, [board, turn, mode, end, history, historyIdx]);
 
   // Daily seed
   useEffect(()=>{
@@ -292,7 +312,7 @@ function Game({mode, seedDaily, onBack}){
     window.turn = turn;
     window.mm4Mode = mode;
     window.getBoardState = () => board;
-    window.loadBoardState = (b) => { setBoard(b); setTurn(1); setEnd(null); setWinLine(null); setTalk(""); setAiExplain(""); startRef.current = Date.now(); };
+    window.loadBoardState = (b) => { setBoard(b); setTurn(1); setEnd(null); setWinLine(null); setTalk(""); setAiExplain(""); setHistory([]); setHistoryIdx(0); setReplaying(false); setReplayIdx(0); setReplayPlaying(false); startRef.current = Date.now(); };
     window.renderBoard = (b) => setBoard(b);
     window.dropPiece = (col) => place(col, turn);
     window.applyMove = (col) => { setAiExplain(explainForMove(board, -1, col)); place(col, -1); };
@@ -357,7 +377,7 @@ function Game({mode, seedDaily, onBack}){
 
   /* ---------- AI Move (respects locked difficulty) ---------- */
   useEffect(()=>{
-    if (mode!=="ai" || end || turn!==-1) return;
+    if (mode!=="ai" || end || turn!==-1 || replaying || historyIdx < history.length) return;
 
     const timer = setTimeout(()=>{
       if (end || turn!==-1) return;
@@ -400,7 +420,20 @@ function Game({mode, seedDaily, onBack}){
       if (typeof chosen === "number") place(chosen, -1);
     }, 650); // plugin gets a short window; our AI then acts
     return ()=> clearTimeout(timer);
-  }, [mode, turn, end, board, stats]);
+  }, [mode, turn, end, board, stats, replaying, historyIdx, history.length]);
+
+  // Replay playback
+  useEffect(()=>{
+    if (!replaying || !replayPlaying) return;
+    if (replayIdx >= history.length){ setReplayPlaying(false); return; }
+    const timer = setTimeout(()=>{
+      const player = replayIdx % 2 === 0 ? 1 : -1;
+      const col = history[replayIdx];
+      setBoard(b=> play(b, col, player));
+      setReplayIdx(replayIdx+1);
+    }, 700);
+    return ()=> clearTimeout(timer);
+  }, [replaying, replayPlaying, replayIdx, history]);
 
   // Onboarding pulse once
   useEffect(()=>{
@@ -417,18 +450,28 @@ function Game({mode, seedDaily, onBack}){
         : (end==="player_win" ? "P1 wins!" : end==="ai_win" ? "P2 wins!" : "Draw"))
     : (turn===1 ? (mode==="ai"?"Your move (Yellow)":"P1 move (Yellow)") : (mode==="ai"?"AI is thinking…":"P2 move (Red)"));
 
-  function place(col, who){
-    if (end) return false;
+  function place(col, who, opts={}){
+    if (end && !opts.allowAfterEnd) return false;
     const c = clampCol(col);
     if (!canPlay(board,c)) return false;
 
     const nb = play(board, c, who);
     setBoard(nb);
 
+    const newIdx = historyIdx + 1;
+    if (!opts.skipHist){
+      setHistory(h=>{
+        const nh = h.slice(0, historyIdx);
+        nh.push(c);
+        return nh;
+      });
+    }
+    setHistoryIdx(newIdx);
+
     const w = Engine.winner(nb);
-    if (w === 1)  return finish("player_win", Engine.findWinLine(nb));
-    if (w === -1) return finish("ai_win",     Engine.findWinLine(nb));
-    if (w === 2)  return finish("draw",       null);
+    if (w === 1)  return finish("player_win", Engine.findWinLine(nb), opts);
+    if (w === -1) return finish("ai_win",     Engine.findWinLine(nb), opts);
+    if (w === 2)  return finish("draw",       null, opts);
 
     const nt = -who;
     setTurn(nt);
@@ -438,7 +481,7 @@ function Game({mode, seedDaily, onBack}){
     return true;
   }
 
-  function finish(outcomeKey, line){
+  function finish(outcomeKey, line, opts={}){
     setEnd(outcomeKey);
     setWinLine(line);
 
@@ -452,7 +495,7 @@ function Game({mode, seedDaily, onBack}){
     const announce = document.getElementById("announce");
     if (announce) announce.textContent = `${statusText} — ${talk}`;
 
-    record(outcomeKey);
+    if (opts.recordGame !== false) record(outcomeKey);
     window.dispatchEvent(new CustomEvent("mm4:gameend",{detail:{outcome:outcomeKey}}));
     if (window.MindMatchAI?.onGameEnd) window.MindMatchAI.onGameEnd(outcomeKey);
     return true;
@@ -460,7 +503,55 @@ function Game({mode, seedDaily, onBack}){
 
   function reset(){
     setBoard(emptyBoard()); setTurn(1); setEnd(null); setWinLine(null); setTalk(""); setAiExplain("");
+    setHistory([]); setHistoryIdx(0); setReplaying(false); setReplayIdx(0); setReplayPlaying(false);
     startRef.current = Date.now();
+  }
+
+  function undo(){
+    if (historyIdx === 0 || replaying) return;
+    const col = history[historyIdx-1];
+    setBoard(b=>{
+      const nb = clone(b);
+      nb[col] = nb[col].slice(0, nb[col].length-1);
+      return nb;
+    });
+    setHistoryIdx(historyIdx-1);
+    setTurn(-turn);
+    setEnd(null); setWinLine(null); setTalk(""); setAiExplain("");
+  }
+
+  function redo(){
+    if (historyIdx >= history.length || replaying) return;
+    const col = history[historyIdx];
+    const player = historyIdx % 2 === 0 ? 1 : -1;
+    place(col, player, {skipHist:true, recordGame:false});
+  }
+
+  function startReplay(){
+    replayFinalRef.current = {end, winLine, talk};
+    setReplaying(true);
+    setReplayIdx(0);
+    setReplayPlaying(false);
+    setBoard(emptyBoard());
+    setTurn(1);
+    setEnd(null); setWinLine(null); setTalk(""); setAiExplain("");
+  }
+
+  function toggleReplay(){
+    if (replayIdx >= history.length){
+      setReplayIdx(0); setBoard(emptyBoard());
+    }
+    setReplayPlaying(p=>!p);
+  }
+
+  function stopReplay(){
+    setReplaying(false);
+    setReplayPlaying(false);
+    const fin = replayFinalRef.current;
+    setBoard(boardFromHistory(history));
+    setEnd(fin?.end || end);
+    setWinLine(fin?.winLine || null);
+    setTalk(fin?.talk || ""); setAiExplain("");
   }
 
   async function share(){
@@ -480,42 +571,55 @@ function Game({mode, seedDaily, onBack}){
     <>
       {/* Controls */}
       <div className="modebar">
-        <button onClick={onBack}>Home</button>
-        <button onClick={reset}>Reset</button>
-        {mode==="ai" && <button id="btnHint">Hint</button>}
+        {replaying ? (
+          <>
+            <button onClick={stopReplay}>Exit</button>
+            <button onClick={toggleReplay}>{replayPlaying ? "Pause" : "Play"}</button>
+          </>
+        ) : (
+          <>
+            <button onClick={onBack}>Home</button>
+            <button onClick={reset}>Reset</button>
+            <button onClick={undo} disabled={historyIdx===0}>Undo</button>
+            <button onClick={redo} disabled={historyIdx===history.length}>Redo</button>
+            {mode==="ai" && <button id="btnHint">Hint</button>}
 
-        {/* Difficulty picker (AI only). Disabled after first move. */}
-        {mode==="ai" && (
-          <label className="tiny" style={{display:"inline-flex", alignItems:"center", gap:6}}>
-            Level
-            <select
-              value={level}
-              onChange={(e)=> setLevelPersist(e.target.value)}
-              aria-label="AI difficulty"
-              disabled={totalPieces(board) > 0}
-              style={{padding:"6px 8px", borderRadius:8}}
-            >
-              <option>Auto</option>
-              <option>Easy</option>
-              <option>Medium</option>
-              <option>Hard</option>
-              <option>Expert</option>
-            </select>
-          </label>
+            {/* Difficulty picker (AI only). Disabled after first move. */}
+            {mode==="ai" && (
+              <label className="tiny" style={{display:"inline-flex", alignItems:"center", gap:6}}>
+                Level
+                <select
+                  value={level}
+                  onChange={(e)=> setLevelPersist(e.target.value)}
+                  aria-label="AI difficulty"
+                  disabled={totalPieces(board) > 0}
+                  style={{padding:"6px 8px", borderRadius:8}}
+                >
+                  <option>Auto</option>
+                  <option>Easy</option>
+                  <option>Medium</option>
+                  <option>Hard</option>
+                  <option>Expert</option>
+                </select>
+              </label>
+            )}
+          </>
         )}
       </div>
 
       {/* Show chosen difficulty ONLY before first move */}
-      {mode==="ai" && totalPieces(board)===0 && (
+      {!replaying && mode==="ai" && totalPieces(board)===0 && (
         <p className="tiny" style={{textAlign:"center", margin:"0 0 6px", opacity:.9}}>
           AI Level: <b>{lockedLevelRef.current}</b>
         </p>
       )}
 
-      <p className="tiny" role="status" aria-live="polite" style={{textAlign:"center", margin:"4px 0 2px"}}>
-        {statusText}
-      </p>
-      {aiExplain && turn===1 && !end && totalPieces(board)>0 && (
+      {!replaying && (
+        <p className="tiny" role="status" aria-live="polite" style={{textAlign:"center", margin:"4px 0 2px"}}>
+          {statusText}
+        </p>
+      )}
+      {!replaying && aiExplain && turn===1 && !end && totalPieces(board)>0 && (
         <p className="tiny" style={{textAlign:"center", margin:"0 0 6px", opacity:.9}}>
           AI played that because: <em>{aiExplain}</em>
         </p>
@@ -542,7 +646,7 @@ function Game({mode, seedDaily, onBack}){
                 role="columnheader"
                 aria-colindex={c+1}
                 onMouseEnter={()=> setFocusCol(c)}
-                onClick={()=> (mode==="ai" ? (turn===1 && window.dropPiece(c)) : window.dropPiece(c))}
+                onClick={()=> !replaying && (mode==="ai" ? (turn===1 && window.dropPiece(c)) : window.dropPiece(c))}
                 title={caution ? "Careful: edge here can enable opponent reply" : ""}
                 style={{
                   position:"relative",
@@ -577,20 +681,27 @@ function Game({mode, seedDaily, onBack}){
         </div>
         {!!winLine && <WinOverlay line={winLine} />}
       </div>
+      {replaying && (
+        <p className="tiny" style={{textAlign:"center", margin:"4px 0 2px"}}>
+          Move {Math.min(replayIdx, history.length)}/{history.length}
+        </p>
+      )}
 
       {/* AI-only stats */}
-      <div className="stats">
-        <div>📊 Games: <b>{stats.games}</b> · ✅ Wins: <b>{stats.wins}</b> · ❌ Losses: <b>{stats.losses}</b> · 🤝 Draws: <b>{stats.draws}</b> · 🔥 Streak: <b>{stats.streak}</b></div>
-        <div style={{marginTop:"6px"}}>
-          <button onClick={reset} style={{marginRight:8}}>Rematch</button>
-          {mode==="ai" && <button onClick={()=>{ reset(); setTurn(-1); window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:-1}})); }}>AI first move</button>}
-          <button onClick={resetStats} style={{marginLeft:8}}>Reset stats</button>
-          <button onClick={share} style={{marginLeft:8}}>Share</button>
+      {!replaying && (
+        <div className="stats">
+          <div>📊 Games: <b>{stats.games}</b> · ✅ Wins: <b>{stats.wins}</b> · ❌ Losses: <b>{stats.losses}</b> · 🤝 Draws: <b>{stats.draws}</b> · 🔥 Streak: <b>{stats.streak}</b></div>
+          <div style={{marginTop:"6px"}}>
+            <button onClick={reset} style={{marginRight:8}}>Rematch</button>
+            {mode==="ai" && <button onClick={()=>{ reset(); setTurn(-1); window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:-1}})); }}>AI first move</button>}
+            <button onClick={resetStats} style={{marginLeft:8}}>Reset stats</button>
+            <button onClick={share} style={{marginLeft:8}}>Share</button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Result modal */}
-      {end && (
+      {end && !replaying && (
         <div className="modal" role="dialog" aria-modal="true">
           <div className="dialog">
             <h2>
@@ -603,6 +714,7 @@ function Game({mode, seedDaily, onBack}){
               <button onClick={reset}>Play again</button>
               <button onClick={share}>Share</button>
               {mode==="ai" && <button onClick={()=>{ reset(); setTurn(-1); window.dispatchEvent(new CustomEvent("mm4:turn",{detail:{turn:-1}})); }}>AI first move</button>}
+              <button onClick={startReplay}>Replay</button>
               <button onClick={onBack}>Home</button>
             </div>
           </div>
