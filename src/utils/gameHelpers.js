@@ -107,7 +107,7 @@ export function fireConfetti(canvas) {
         "#10b981",
         "#3b82f6",
         "#a855f7",
-      ][p.s | 0 % 5];
+      ][(p.s | 0) % 5];
       ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s);
       ctx.restore();
     });
