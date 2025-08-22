@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import * as Engine from "../../ai/engine.js"; // adjust path to root-level ai folder
+import * as Engine from "../../ai/engine.js";
 import { lsGet, lsSet } from "../utils/storage.js";
 
 /* ============ Board helpers ============ */
