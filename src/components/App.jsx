@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import * as Engine from "../ai/engine.js"; // adjust path if needed
+import * as Engine from "../../ai/engine.js"; // adjust path to root-level ai folder
+import { lsGet, lsSet } from "../utils/storage.js";
 
 /* ============ Board helpers ============ */
 const ROWS = 6, COLS = 7;
@@ -156,8 +157,11 @@ export default function App(){
 
 /* ============ Home ============ */
 function Home({onPlayAI,onPlay2P,onDaily}){
-  const [soundOn, setSoundOn] = useState(()=> JSON.parse(localStorage.getItem("mm4_sound_on")||"true"));
-  useEffect(()=>{ SND.toggle(soundOn); localStorage.setItem("mm4_sound_on", JSON.stringify(soundOn)); }, [soundOn]);
+  const [soundOn, setSoundOn] = useState(() => JSON.parse(lsGet("mm4_sound_on", "true")));
+  useEffect(() => {
+    SND.toggle(soundOn);
+    lsSet("mm4_sound_on", JSON.stringify(soundOn));
+  }, [soundOn]);
 
   return (
     <div className="card" style={{margin:"0 auto", maxWidth:520}}>

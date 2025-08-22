@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import * as Engine from "../../ai/engine.js";
 import Board from "./Board.jsx";
 import ResultModal from "./Modal.jsx";
+import { lsGet, lsSet } from "../utils/storage.js";
 import {
   ROWS,
   COLS,
@@ -29,7 +30,7 @@ export default function Game({ mode, seedDaily, onBack }) {
   const [focusCol, setFocusCol] = useState(3);
   const [cautionCols, setCautionCols] = useState([]);
 
-  const [level, setLevel] = useState(() => localStorage.getItem("mm4_level") || "Auto");
+  const [level, setLevel] = useState(() => lsGet("mm4_level", "Auto"));
   const lockedLevelRef = useRef(level);
   const moves = totalPieces(board);
   useEffect(() => {
@@ -38,13 +39,15 @@ export default function Game({ mode, seedDaily, onBack }) {
 
   const setLevelPersist = (v) => {
     setLevel(v);
-    localStorage.setItem("mm4_level", v);
+    lsSet("mm4_level", v);
   };
 
   const [stats, setStats] = useState(() =>
     JSON.parse(
-      localStorage.getItem("mm4_stats") ||
+      lsGet(
+        "mm4_stats",
         `{"games":0,"wins":0,"losses":0,"draws":0,"streak":0}`
+      )
     )
   );
   const record = (outcomeKey) => {
@@ -60,12 +63,12 @@ export default function Game({ mode, seedDaily, onBack }) {
     } else {
       s.draws++;
     }
-    localStorage.setItem("mm4_stats", JSON.stringify(s));
+    lsSet("mm4_stats", JSON.stringify(s));
     setStats(s);
   };
   const resetStats = () => {
     const s = { games: 0, wins: 0, losses: 0, draws: 0, streak: 0 };
-    localStorage.setItem("mm4_stats", JSON.stringify(s));
+    lsSet("mm4_stats", JSON.stringify(s));
     setStats(s);
   };
 
@@ -73,7 +76,7 @@ export default function Game({ mode, seedDaily, onBack }) {
   const lastSaved = useRef("");
 
   useEffect(() => {
-    const raw = localStorage.getItem("mm4_autosave");
+    const raw = lsGet("mm4_autosave");
     if (!raw) return;
     try {
       const { b, t } = JSON.parse(raw);
@@ -89,7 +92,7 @@ export default function Game({ mode, seedDaily, onBack }) {
   useEffect(() => {
     const snap = JSON.stringify({ b: board, t: turn, m: mode, e: end });
     if (snap !== lastSaved.current) {
-      localStorage.setItem("mm4_autosave", snap);
+      lsSet("mm4_autosave", snap);
       lastSaved.current = snap;
     }
   }, [board, turn, mode, end]);
@@ -238,8 +241,8 @@ export default function Game({ mode, seedDaily, onBack }) {
 
   useEffect(() => {
     const key = "mm4_seen_onboarding";
-    if (localStorage.getItem(key)) return;
-    localStorage.setItem(key, "1");
+    if (lsGet(key)) return;
+    lsSet(key, "1");
     const center = document.querySelector('[data-col="3"]');
     if (center) {
       center.classList.add("onboard-pulse");

@@ -1,7 +1,19 @@
 // ai/rating.js
 const DEFAULT = { rating: 1200, games: 0 };
-export function getSkill(){ return JSON.parse(localStorage.getItem("mm4_skill")||JSON.stringify(DEFAULT)); }
-export function saveSkill(s){ localStorage.setItem("mm4_skill", JSON.stringify(s)); }
+export function getSkill(){
+  try {
+    return JSON.parse(localStorage.getItem("mm4_skill") || JSON.stringify(DEFAULT));
+  } catch (e) {
+    return DEFAULT;
+  }
+}
+export function saveSkill(s){
+  try {
+    localStorage.setItem("mm4_skill", JSON.stringify(s));
+  } catch (e) {
+    // ignore
+  }
+}
 
 // result: 1=AI wins, 0=AI loses, 0.5=draw
 export function updateSkill(result){

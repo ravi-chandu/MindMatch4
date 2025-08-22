@@ -1,13 +1,14 @@
 import "../ai/adapter.js";
 import "../ai/mm4-plugin.js";
 import "../ai/mm4-plugin-wire.js";
+import { lsGet, lsSet } from "./utils/storage.js";
 
 // Apply saved theme immediately
-const savedTheme = localStorage.getItem("mm4_theme") || "auto";
+let savedTheme = lsGet("mm4_theme", "auto");
 document.documentElement.setAttribute("data-theme", savedTheme);
 
 function setTheme(t){
-  localStorage.setItem("mm4_theme", t);
+  lsSet("mm4_theme", t);
   document.documentElement.setAttribute("data-theme", t);
 }
 window.addEventListener('DOMContentLoaded', () => {
