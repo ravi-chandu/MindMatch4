@@ -1,3 +1,4 @@
+/* eslint-env jest */
 import { winner, bestMoveTimeboxed, findWinLine } from '../ai/engine.js';
 
 describe('winner', () => {

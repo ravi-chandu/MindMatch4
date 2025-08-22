@@ -1,4 +1,4 @@
-import * as Engine from "../../ai/engine.js";
+import * as Engine from '../../ai/engine.js';
 
 export const ROWS = 6;
 export const COLS = 7;
@@ -12,14 +12,15 @@ export const play = (b, c, p) => {
   nb[c] = (nb[c] || []).concat(p);
   return nb;
 };
-export const totalPieces = (b) => b.reduce((s, col) => s + (col?.length || 0), 0);
+export const totalPieces = (b) =>
+  b.reduce((s, col) => s + (col?.length || 0), 0);
 
 /* ---------- Threat count (for hints) ---------- */
 export function nearWinScore(board, player = 1) {
   const at = (r, c) =>
     r < 0 || r >= ROWS || c < 0 || c >= COLS
       ? -99
-      : board[c][ROWS - 1 - r] ?? 0;
+      : (board[c][ROWS - 1 - r] ?? 0);
   let score = 0;
   const dirs = [
     [1, 0],
@@ -54,35 +55,35 @@ export function engageMessage(outcome, { ms = 0, near = 0 } = {}) {
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   const AI = [
     close
-      ? "So close! I squeezed a line. Rematch? 😉"
-      : "Gotcha 😏 — try again?",
+      ? 'So close! I squeezed a line. Rematch? 😉'
+      : 'Gotcha 😏 — try again?',
     veryClose
       ? "You nearly had me there. One different drop and it's yours."
-      : "Watch diagonals. Hint helps in tight spots.",
+      : 'Watch diagonals. Hint helps in tight spots.',
     long
-      ? "Epic grind! I found the last thread. Another round?"
-      : "Bet you can’t beat me twice.",
+      ? 'Epic grind! I found the last thread. Another round?'
+      : 'Bet you can’t beat me twice.',
   ];
   const YOU = [
-    veryClose ? "Brilliant clutch! 🎉" : "Nice finish! 🔥",
-    quick ? "Speedrun vibes. Again?" : "That patience paid off. One more?",
-    "I’m dialing the difficulty up a notch…",
+    veryClose ? 'Brilliant clutch! 🎉' : 'Nice finish! 🔥',
+    quick ? 'Speedrun vibes. Again?' : 'That patience paid off. One more?',
+    'I’m dialing the difficulty up a notch…',
   ];
   const DRAW = [
-    "Stalemate… rematch?",
+    'Stalemate… rematch?',
     close
-      ? "Both had threats brewing. Let’s settle this."
-      : "Even match! One more?",
+      ? 'Both had threats brewing. Let’s settle this.'
+      : 'Even match! One more?',
   ];
-  if (outcome === "ai_win") return pick(AI);
-  if (outcome === "player_win") return pick(YOU);
+  if (outcome === 'ai_win') return pick(AI);
+  if (outcome === 'player_win') return pick(YOU);
   return pick(DRAW);
 }
 
 /* ---------- Confetti ---------- */
 export function fireConfetti(canvas) {
   if (!canvas) return;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext('2d');
   const W = (canvas.width = innerWidth),
     H = (canvas.height = innerHeight);
   const parts = Array.from({ length: 140 }, () => ({
@@ -101,13 +102,9 @@ export function fireConfetti(canvas) {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate((t + p.a) * 0.2);
-      ctx.fillStyle = [
-        "#ef4444",
-        "#f59e0b",
-        "#10b981",
-        "#3b82f6",
-        "#a855f7",
-      ][(p.s | 0) % 5];
+      ctx.fillStyle = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7'][
+        (p.s | 0) % 5
+      ];
       ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s);
       ctx.restore();
     });
@@ -121,10 +118,10 @@ export function fireConfetti(canvas) {
 
 /* ---------- Share ---------- */
 export function shareText(board, outcome) {
-  const map = { "-1": "🔴", "1": "🟡", "0": "⚫" };
+  const map = { '-1': '🔴', 1: '🟡', 0: '⚫' };
   const rows = [];
   for (let r = 0; r < ROWS; r++) {
-    let line = "";
+    let line = '';
     for (let c = 0; c < COLS; c++) {
       const v = board[c][ROWS - 1 - r] ?? 0;
       line += map[String(v)];
@@ -132,9 +129,9 @@ export function shareText(board, outcome) {
     rows.push(line);
   }
   const head = `MindMatch 4 — ${
-    outcome === "player_win" ? "I won" : "They won"
+    outcome === 'player_win' ? 'I won' : 'They won'
   }\n`;
-  return `${head}${rows.join("\n")}\nhttps://ravi-chandu.github.io/MindMatch4/`;
+  return `${head}${rows.join('\n')}\nhttps://ravi-chandu.github.io/MindMatch4/`;
 }
 
 /* ---------- Hints with reasons ---------- */
@@ -145,22 +142,27 @@ export function reasonFor(board, player, col) {
   const opp = -player;
   const nb = play(board, col, player);
   if (Engine.winner(nb) === player)
-    return { col, tag: "win", note: "Winning move" };
+    return { col, tag: 'win', note: 'Winning move' };
   if (Engine.winner(play(board, col, opp)) === opp)
-    return { col, tag: "block", note: "Block opponent" };
+    return { col, tag: 'block', note: 'Block opponent' };
   const ourThreats = nearWinScore(nb, player);
-  if (ourThreats >= 2) return { col, tag: "fork", note: "Creates multiple threats" };
-  if (col === 3) return { col, tag: "center", note: "Controls center" };
-  return { col, tag: "heuristic", note: "Good shape" };
+  if (ourThreats >= 2)
+    return { col, tag: 'fork', note: 'Creates multiple threats' };
+  if (col === 3) return { col, tag: 'center', note: 'Controls center' };
+  return { col, tag: 'heuristic', note: 'Good shape' };
 }
 
 export function computeLocalHints(board, player = 1) {
   const legal = [];
   for (let c = 0; c < COLS; c++) if (canPlay(board, c)) legal.push(c);
-  if (!legal.length) return { best: [], note: "No moves" };
+  if (!legal.length) return { best: [], note: 'No moves' };
   for (const c of legal) {
     if (Engine.winner(play(board, c, player)) === player)
-      return { best: [c], note: "Winning move", reasons: [reasonFor(board, player, c)] };
+      return {
+        best: [c],
+        note: 'Winning move',
+        reasons: [reasonFor(board, player, c)],
+      };
   }
   const opp = -player,
     blocks = [];
@@ -170,7 +172,7 @@ export function computeLocalHints(board, player = 1) {
   if (blocks.length)
     return {
       best: blocks,
-      note: "Block opponent",
+      note: 'Block opponent',
       reasons: blocks.map((c) => reasonFor(board, player, c)),
     };
   const scored = [];
@@ -188,7 +190,7 @@ export function computeLocalHints(board, player = 1) {
       scored.push({
         c,
         score: -1e9,
-        reason: { col: c, tag: "danger", note: "Gives immediate reply" },
+        reason: { col: c, tag: 'danger', note: 'Gives immediate reply' },
       });
       continue;
     }
@@ -201,13 +203,13 @@ export function computeLocalHints(board, player = 1) {
   const top = scored.filter((s) => s.score > -1e8).slice(0, 3);
   return {
     best: top.map((s) => s.c),
-    note: "Best by heuristic",
+    note: 'Best by heuristic',
     reasons: top.map((s) => s.reason),
   };
 }
 
 /* ---------- Lightweight MCTS ---------- */
-export function randomHeuristicMove(b, p) {
+export function randomHeuristicMove(b) {
   const cand = [];
   for (let c = 0; c < COLS; c++) if (canPlay(b, c)) cand.push(c);
   if (!cand.length) return -1;
@@ -227,7 +229,7 @@ export function playoutWinner(board, startP) {
     w = Engine.winner(b);
   let safety = 72;
   while (w === 0 && safety--) {
-    const c = randomHeuristicMove(b, p);
+    const c = randomHeuristicMove(b);
     if (c < 0) break;
     b = play(b, c, p);
     w = Engine.winner(b);
@@ -239,15 +241,15 @@ export function playoutWinner(board, startP) {
 export function mctsPick(board, player, iters = 200) {
   const moves = [];
   for (let c = 0; c < COLS; c++) if (canPlay(board, c)) moves.push(c);
-  if (!moves.length) return { col: -1, note: "No moves" };
+  if (!moves.length) return { col: -1, note: 'No moves' };
   for (const c of moves) {
     if (Engine.winner(play(board, c, player)) === player)
-      return { col: c, note: "Winning move" };
+      return { col: c, note: 'Winning move' };
   }
   const opp = -player;
   for (const c of moves) {
     if (Engine.winner(play(board, c, opp)) === opp)
-      return { col: c, note: "Block opponent" };
+      return { col: c, note: 'Block opponent' };
   }
   const scores = new Map(moves.map((c) => [c, CENTER_PREF[c] * 0.2]));
   for (let i = 0; i < iters; i++) {
@@ -258,5 +260,5 @@ export function mctsPick(board, player, iters = 200) {
     else if (w === -player) scores.set(c, scores.get(c) - 0.7);
   }
   const best = [...scores.entries()].sort((a, b) => b[1] - a[1])[0][0];
-  return { col: best, note: "Monte‑Carlo rollout" };
+  return { col: best, note: 'Monte‑Carlo rollout' };
 }
