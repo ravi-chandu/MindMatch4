@@ -353,19 +353,19 @@ function Game({mode, seedDaily, onBack}){
       <div className="board-wrap">
         <div className="board" role="grid" aria-label="Connect Four" aria-rowcount={ROWS} aria-colcount={COLS} tabIndex={0} ref={boardRef}>
           {Array.from({length: COLS}).map((_, c) => {
-            const isFocused = (c===Number.isFinite ? false : null) || false; // harmless; outline handled inline
+            const isFocused = focusCol === c;
             const caution = cautionCols.includes(c);
             return (
               <div
                 key={c}
-                className={`col ${caution ? "edge-caution":""}`}
+                className={`col ${isFocused ? "kbd-focus" : ""} ${caution ? "edge-caution":""}`}
                 data-col={c}
                 role="columnheader"
                 aria-colindex={c+1}
-                onMouseEnter={()=> {}}
+                onMouseEnter={()=> setFocusCol(c)}
                 onClick={()=> (mode==="ai" ? (turn===1 && window.dropPiece(c)) : window.dropPiece(c))}
                 title={caution ? "Careful: edge here can enable opponent reply" : ""}
-                style={{position:"relative"}}
+                style={{position:"relative", ...(isFocused ? {outline:"2px solid var(--blue)", outlineOffset:"2px", borderRadius:12} : null)}}
               >
                 {caution && <HazardBadge />}
                 {Array.from({length: ROWS}).map((_, rr) => {
