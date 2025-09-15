@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as Engine from "../../ai/engine.js"; // adjust path to root-level ai folder
+import HazardBadge from "./HazardBadge.jsx";
+import WinOverlay from "./WinOverlay.jsx";
 
 /* ============ Board helpers ============ */
 const ROWS = 6, COLS = 7;
@@ -114,18 +116,6 @@ function mctsPick(board, player, iters=600){
   }
   const best=[...scores.entries()].sort((a,b)=> b[1]-a[1])[0][0];
   return {col:best, note:`Monte‑Carlo rollout (${iters})`};
-}
-
-/* ============ Hazard badge (top‑center, above discs) ============ */
-function HazardBadge(){
-  return (
-    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24"
-      style={{position:"absolute", top:-10, left:"50%", transform:"translateX(-50%)", zIndex:3, pointerEvents:"none"}}>
-      <path d="M12 2 1 21h22L12 2z" fill="#F59E0B" stroke="#B45309" strokeWidth="1"/>
-      <rect x="11" y="8" width="2" height="7" rx="1" fill="#111827"/>
-      <rect x="11" y="17" width="2" height="2" rx="1" fill="#111827"/>
-    </svg>
-  );
 }
 
 /* ============ App shell ============ */
@@ -402,24 +392,6 @@ function Game({mode, seedDaily, onBack}){
         )}
       </div>
     </>
-  );
-}
-
-/* ============ Win line overlay ============ */
-function WinOverlay({line}){
-  const gap = 10;
-  const cell = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--cell")) || 56;
-  const pad=8;
-  const x = (c)=> pad + c*(cell+gap) + cell/2;
-  const y = (r)=> pad + r*(cell+gap) + cell/2;
-  const first = {X:x(line[0].c), Y:y(line[0].r)};
-  const last  = {X:x(line[3].c), Y:y(line[3].r)};
-  return (
-    <div className="win-overlay" aria-hidden="true">
-      <svg>
-        <line x1={first.X} y1={first.Y} x2={last.X} y2={last.Y} stroke="gold" strokeWidth="6" strokeLinecap="round" />
-      </svg>
-    </div>
   );
 }
 
