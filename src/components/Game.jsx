@@ -71,8 +71,13 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
     const raw = localStorage.getItem("mm4_autosave");
     if (!raw) return;
     try {
-      const { b, t } = JSON.parse(raw);
+      const { b, t, e } = JSON.parse(raw);
       if (b && Array.isArray(b) && b.length === COLS) {
+        const isFinished = Boolean(e) || Engine.winner(b) !== 0;
+        if (isFinished) {
+          localStorage.removeItem("mm4_autosave");
+          return;
+        }
         setBoard(b);
         setTurn(t ?? 1);
         setWinLine(null);
@@ -82,7 +87,12 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
     } catch {}
   }, []);
   useEffect(() => {
-    const snap = JSON.stringify({ b: board, t: turn, m: mode, e: end });
+    if (end) {
+      localStorage.removeItem("mm4_autosave");
+      lastSaved.current = "";
+      return;
+    }
+    const snap = JSON.stringify({ b: board, t: turn, m: mode, e: null });
     if (snap !== lastSaved.current) {
       localStorage.setItem("mm4_autosave", snap);
       lastSaved.current = snap;
@@ -263,6 +273,14 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
     ? "AI is thinking…"
     : "P2 move (Red)";
 
+  const playHintText = end
+    ? "Tap Play Again or New to start the next round."
+    : mode === "ai"
+    ? turn === 1
+      ? "Your turn: tap or click any column to drop Yellow."
+      : "AI is thinking. You can press Hint any time."
+    : `${turn === 1 ? "Player 1" : "Player 2"}: tap or click any column to drop.`;
+
   function place(col, who) {
     if (end) return false;
     const c = clampCol(col);
@@ -349,6 +367,7 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
       <p className="status-bar" role="status" aria-live="polite">
         {statusText}
       </p>
+      <p className="play-help">{playHintText}</p>
       <Board
         board={board}
         focusCol={focusCol}
