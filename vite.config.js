@@ -6,4 +6,5 @@ export default defineConfig({
   base: "/MindMatch4/",
   plugins: [react()],
   build: { outDir: "dist", sourcemap: false },
+  test: { globals: true },
 });

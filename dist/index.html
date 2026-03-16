@@ -4,26 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
-    <meta name="theme-color" content="#ffffff"  media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 
-    <title>MindMatch 4 | Free Adaptive Connect Four Game Online</title>
-    <meta name="description" content="Play MindMatch 4 — the free, smart Connect Four game with adaptive AI, hints, and multiplayer. Fun, fast, and mobile-friendly." />
+    <title>MindMatch | Connect Four and Reversi Brain Games</title>
+    <meta name="description" content="Play MindMatch online with two strategy games: adaptive Connect Four and guided Reversi. Built for focus, planning, and smarter play for all ages." />
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
 
-    <!-- Social -->
-    <meta property="og:title" content="MindMatch 4 — Adaptive Connect Four" />
-    <meta property="og:description" content="Beat the AI… if you can. It learns your strategy and ramps up." />
+    <meta property="og:title" content="MindMatch - Connect Four and Reversi" />
+    <meta property="og:description" content="Train planning, focus, and tactical thinking with two polished strategy games in one place." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://ravi-chandu.github.io/MindMatch4/" />
     <meta property="og:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
-    <!-- Optional if you have a handle: <meta name="twitter:site" content="@YourHandle" /> -->
 
-    <!-- Icons resolve under /MindMatch4/ -->
     <link rel="icon" href="/MindMatch4/favicon.ico" />
-    <link rel="icon" type="image/png" sizes="32x32"  href="/MindMatch4/logo-32.png" />
-    <link rel="icon" type="image/png" sizes="64x64"  href="/MindMatch4/logo-64.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/MindMatch4/logo-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/MindMatch4/logo-64.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/MindMatch4/logo-192.png" />
     <link rel="apple-touch-icon" sizes="512x512" href="/MindMatch4/logo-512.png" />
     <link rel="manifest" href="/MindMatch4/manifest.json" />
@@ -35,7 +32,7 @@
         --hole:#e5e7eb; --grid:#1f2937;
         --red:#ef4444; --yellow:#fbbf24; --green:#16a34a; --blue:#3b82f6; --violet:#7c3aed;
         --shadow:0 10px 30px rgba(0,0,0,.12);
-        --cell:56px; --gap:10px; /* updated by fitCell() */
+        --cell:56px; --gap:10px;
       }
       @media (prefers-color-scheme: dark){
         :root{
@@ -67,7 +64,6 @@
         font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
       }
 
-      /* Header */
       .site-header{
         position:sticky; top:0; z-index:50;
         display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
@@ -84,14 +80,13 @@
       .card{ background: var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:14px; box-shadow: var(--shadow); }
       .big-options{ display:grid; gap:12px; margin: 10px 0; }
       .big-btn{ padding:16px; border-radius:14px; border:1px solid var(--grid); background:var(--bg2); color:var(--ink); cursor:pointer; font-size:1.05rem; font-weight:600; }
-      .big-btn.ai{    border-color: var(--blue) }
-      .big-btn.p2{    border-color: var(--green) }
+      .big-btn.ai{ border-color: var(--blue) }
+      .big-btn.p2{ border-color: var(--green) }
       .big-btn.daily{ border-color: var(--violet) }
 
       .modebar{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:8px 0 10px; }
       .modebar button{ padding:8px 12px; border-radius:10px; border:1px solid var(--grid); background:var(--bg2); color:var(--ink); cursor:pointer }
 
-      /* Board container – CENTERED */
       .board-wrap{ position:relative; margin: 0 auto; }
       .board{
         display:grid;
@@ -103,7 +98,7 @@
         border-radius:14px;
         box-shadow:var(--shadow);
         width:calc(7 * var(--cell) + 6 * var(--gap));
-        margin:0 auto; /* center grid */
+        margin:0 auto;
       }
       .col{ display:grid; grid-template-rows:repeat(6, var(--cell)); gap:var(--gap); cursor:pointer; position:relative; }
       .cell{
@@ -113,15 +108,11 @@
       }
       .disc{ width:calc(var(--cell) - 8px); height:calc(var(--cell) - 8px); border-radius:999px; box-shadow: inset 0 4px 10px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.2); }
       .disc.yellow{ background: radial-gradient(circle at 32% 28%, #ffe9a8, #fbbf24); border: 2px solid #d1a200; }
-      .disc.red{    background: radial-gradient(circle at 32% 28%, #ff8a8a, #ef4444); border: 2px solid #b91c1c; }
+      .disc.red{ background: radial-gradient(circle at 32% 28%, #ff8a8a, #ef4444); border: 2px solid #b91c1c; }
 
-      /* Hint column outline */
       .hint-col { outline: 3px solid var(--green); outline-offset: 2px; }
-
-      /* Winner line overlay */
       .win-line{ pointer-events:none; position:absolute; inset:0; z-index:5; width:100%; height:100%; }
 
-      /* Result modal */
       .modal{ position: fixed; inset: 0; z-index: 70; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,.45); }
       .dialog{ background: var(--panel); border: 1px solid var(--panel-border); border-radius: 18px; padding: 28px 24px 22px; width: min(92vw, 400px); color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,.25); text-align:center; }
       .dialog h2{ margin: 0 0 8px; }
@@ -129,16 +120,14 @@
       .dialog button{ padding:10px 16px; border-radius:10px; border:1px solid var(--grid); background:var(--bg2); color:var(--ink); cursor:pointer; font-size:.9rem; font-weight:500 }
 
       .stats{ margin: 10px auto; text-align:center; color: var(--muted) }
-
       #mm4-confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
     </style>
 
-    <!-- JSON-LD: enhanced for rich results -->
     <script type="application/ld+json">
     {
       "@context":"https://schema.org",
       "@type":"VideoGame",
-      "name":"MindMatch 4 — Adaptive Connect Four",
+      "name":"MindMatch - Strategy Games for Smarter Play",
       "url":"https://ravi-chandu.github.io/MindMatch4/",
       "image":"https://ravi-chandu.github.io/MindMatch4/og-cover.png",
       "applicationCategory":"Game",
@@ -146,7 +135,7 @@
       "inLanguage":"en",
       "gamePlatform":"Web",
       "genre":["Strategy","Board game","Puzzle"],
-      "description":"Smart, adaptive Connect Four with hints, local multiplayer, and offline play.",
+      "description":"A strategy game hub featuring adaptive Connect Four and guided Reversi for children and adults.",
       "author":{"@type":"Person","name":"Ravi Chandu"},
       "publisher":{"@type":"Person","name":"Ravi Chandu"},
       "offers":{
@@ -168,7 +157,6 @@
     }
     </script>
 
-    <!-- JSON-LD: Breadcrumbs -->
     <script type="application/ld+json">
     {
       "@context":"https://schema.org",
@@ -184,22 +172,21 @@
     }
     </script>
 
-    <!-- GA4 -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-E18C1B9SE4"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){ dataLayer.push(arguments); }
       gtag('js', new Date());
       gtag('config', 'G-E18C1B9SE4');
-    </script>
-    <script type="module" crossorigin src="/MindMatch4/assets/index-D5R1zHS-.js"></script>
-    <link rel="stylesheet" crossorigin href="/MindMatch4/assets/index-CT-mq6In.css">
+    </script>
+    <script type="module" crossorigin src="/MindMatch4/assets/index-CRU0njyb.js"></script>
+    <link rel="stylesheet" crossorigin href="/MindMatch4/assets/index-CirSupMX.css">
   </head>
 
   <body>
     <header class="site-header">
-      <div class="tiny">🧠</div>
-      <h1 class="site-title">MindMatch 4</h1>
+      <div class="tiny">MM</div>
+      <h1 class="site-title">MindMatch</h1>
       <div class="theme-toggle">
         <label class="tiny" for="themeSelect" style="margin-right:6px">Theme</label>
         <select id="themeSelect" aria-label="Theme">
@@ -214,6 +201,5 @@
     <canvas id="mm4-confetti"></canvas>
     <span id="announce" aria-live="polite" class="sr-only"></span>
 
-    <!-- Vite entry -->
   </body>
 </html>
