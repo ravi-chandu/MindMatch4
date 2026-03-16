@@ -21,10 +21,20 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// Register service worker
+// Register service worker only outside localhost to avoid stale cache while testing.
 if ("serviceWorker" in navigator) {
-  const swUrl = new URL("sw.js", import.meta.env.BASE_URL).href;
-  navigator.serviceWorker.register(swUrl);
+  const isLocalhost = /^(localhost|127\.0\.0\.1)$/i.test(location.hostname);
+  if (isLocalhost) {
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((r) => r.unregister());
+    });
+    if (window.caches?.keys) {
+      caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+    }
+  } else {
+    const swUrl = new URL("sw.js", import.meta.env.BASE_URL).href;
+    navigator.serviceWorker.register(swUrl);
+  }
 }
 
 // Analytics hooks

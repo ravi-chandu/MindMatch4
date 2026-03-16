@@ -17,9 +17,10 @@ import {
   computeLocalHints,
   reasonFor,
   mctsPick,
+  SND,
 } from "../utils/gameHelpers.js";
 
-export default function Game({ mode, seedDaily, onBack }) {
+export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
   const [board, setBoard] = useState(() => emptyBoard());
   const [turn, setTurn] = useState(1);
   const [end, setEnd] = useState(null);
@@ -29,17 +30,11 @@ export default function Game({ mode, seedDaily, onBack }) {
   const [focusCol, setFocusCol] = useState(3);
   const [cautionCols, setCautionCols] = useState([]);
 
-  const [level, setLevel] = useState(() => localStorage.getItem("mm4_level") || "Auto");
-  const lockedLevelRef = useRef(level);
+  const lockedLevelRef = useRef(difficulty);
   const moves = totalPieces(board);
   useEffect(() => {
-    if (moves === 0) lockedLevelRef.current = level;
-  }, [level, moves]);
-
-  const setLevelPersist = (v) => {
-    setLevel(v);
-    localStorage.setItem("mm4_level", v);
-  };
+    if (moves === 0) lockedLevelRef.current = difficulty;
+  }, [difficulty, moves]);
 
   const [stats, setStats] = useState(() =>
     JSON.parse(
@@ -141,6 +136,7 @@ export default function Game({ mode, seedDaily, onBack }) {
     const btn = document.getElementById("btnHint");
     if (!btn || mode !== "ai") return;
     const handler = () => {
+      SND.hint();
       const h = (window.computeHints
         ? window.computeHints(board, 1)
         : computeLocalHints(board, 1));
@@ -271,23 +267,23 @@ export default function Game({ mode, seedDaily, onBack }) {
     if (end) return false;
     const c = clampCol(col);
     if (!canPlay(board, c)) return false;
+    SND.drop();
     const nb = play(board, c, who);
     setBoard(nb);
     const w = Engine.winner(nb);
     if (w === 1) return finish("player_win", Engine.findWinLine(nb));
     if (w === -1) return finish("ai_win", Engine.findWinLine(nb));
     if (w === 2) return finish("draw", null);
-    const nt = -who;
-    setTurn(nt);
-    if (mode === "ai" && nt === -1) {
-      window.dispatchEvent(new CustomEvent("mm4:turn", { detail: { turn: -1 } }));
-    }
+    setTurn(-who);
     return true;
   }
 
   function finish(outcomeKey, line) {
     setEnd(outcomeKey);
     setWinLine(line);
+    if (outcomeKey === "player_win") SND.win();
+    else if (outcomeKey === "ai_win") SND.lose();
+    else SND.draw();
     const ms = Date.now() - startRef.current;
     const near = nearWinScore(board, 1);
     setTalk(engageMessage(outcomeKey, { ms, near }));
@@ -340,58 +336,19 @@ export default function Game({ mode, seedDaily, onBack }) {
   return (
     <>
       <div className="modebar">
-        <button onClick={onBack}>Home</button>
-        <button onClick={reset}>Reset</button>
-        {mode === "ai" && <button id="btnHint">Hint</button>}
+        <button onClick={onBack} title="Back to Home">🏠</button>
+        <button onClick={reset} title="New game">🔄 New</button>
+        {mode === "ai" && <button id="btnHint" title="Get a hint">💡 Hint</button>}
         {mode === "ai" && (
-          <label
-            className="tiny"
-            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-          >
-            Level
-            <select
-              value={level}
-              onChange={(e) => setLevelPersist(e.target.value)}
-              aria-label="AI difficulty"
-              disabled={totalPieces(board) > 0}
-              style={{ padding: "6px 8px", borderRadius: 8 }}
-            >
-              <option>Auto</option>
-              <option>Easy</option>
-              <option>Medium</option>
-              <option>Hard</option>
-              <option>Expert</option>
-            </select>
-          </label>
+          <span className="level-badge" title="Difficulty">
+            {lockedLevelRef.current}
+          </span>
         )}
       </div>
 
-      {mode === "ai" && totalPieces(board) === 0 && (
-        <p
-          className="tiny"
-          style={{ textAlign: "center", margin: "0 0 6px", opacity: 0.9 }}
-        >
-          AI Level: <b>{lockedLevelRef.current}</b>
-        </p>
-      )}
-
-      <p
-        className="tiny"
-        role="status"
-        aria-live="polite"
-        style={{ textAlign: "center", margin: "4px 0 2px" }}
-      >
+      <p className="status-bar" role="status" aria-live="polite">
         {statusText}
       </p>
-      {aiExplain && turn === 1 && !end && totalPieces(board) > 0 && (
-        <p
-          className="tiny"
-          style={{ textAlign: "center", margin: "0 0 6px", opacity: 0.9 }}
-        >
-          AI played that because: <em>{aiExplain}</em>
-        </p>
-      )}
-
       <Board
         board={board}
         focusCol={focusCol}
@@ -402,37 +359,14 @@ export default function Game({ mode, seedDaily, onBack }) {
         boardRef={boardRef}
       />
 
-      <div className="stats">
-        <div>
-          📊 Games: <b>{stats.games}</b> · ✅ Wins: <b>{stats.wins}</b> · ❌ Losses:
-          <b>{stats.losses}</b> · 🤝 Draws: <b>{stats.draws}</b> · 🔥 Streak:
-          <b>{stats.streak}</b>
+      {mode === "ai" && (
+        <div className="stats-bar">
+          <span>🏆 {stats.wins}</span>
+          <span>💀 {stats.losses}</span>
+          <span>🤝 {stats.draws}</span>
+          <span>🔥 {stats.streak}</span>
         </div>
-        <div style={{ marginTop: "6px" }}>
-          <button onClick={reset} style={{ marginRight: 8 }}>
-            Rematch
-          </button>
-          {mode === "ai" && (
-            <button
-              onClick={() => {
-                reset();
-                setTurn(-1);
-                window.dispatchEvent(
-                  new CustomEvent("mm4:turn", { detail: { turn: -1 } })
-                );
-              }}
-            >
-              AI first move
-            </button>
-          )}
-          <button onClick={resetStats} style={{ marginLeft: 8 }}>
-            Reset stats
-          </button>
-          <button onClick={share} style={{ marginLeft: 8 }}>
-            Share
-          </button>
-        </div>
-      </div>
+      )}
 
       <ResultModal
         end={end}
@@ -445,9 +379,6 @@ export default function Game({ mode, seedDaily, onBack }) {
             ? () => {
                 reset();
                 setTurn(-1);
-                window.dispatchEvent(
-                  new CustomEvent("mm4:turn", { detail: { turn: -1 } })
-                );
               }
             : null
         }

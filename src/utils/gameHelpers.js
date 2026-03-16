@@ -1,5 +1,28 @@
 import * as Engine from "../../ai/engine.js";
 
+/* ---------- Sounds (WebAudio, no assets) ---------- */
+export class Beep {
+  constructor() { this.ctx = null; this.enabled = true; }
+  _ctx() { return this.ctx ?? (this.ctx = new (window.AudioContext || window.webkitAudioContext)()); }
+  toggle(on) { this.enabled = on; }
+  play({ freq = 440, dur = 0.08, type = "sine", gain = 0.06, attack = 0.005, decay = 0.03 }) {
+    if (!this.enabled) return;
+    const ctx = this._ctx(), o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = 0; o.connect(g); g.connect(ctx.destination);
+    const t = ctx.currentTime;
+    g.gain.linearRampToValueAtTime(gain, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay + dur);
+    o.start(t); o.stop(t + attack + decay + dur + 0.02);
+  }
+  click() { this.play({ freq: 520, dur: 0.05, type: "square" }); }
+  drop()  { this.play({ freq: 240, dur: 0.10, type: "sawtooth" }); }
+  win()   { this.play({ freq: 880, dur: 0.12, type: "triangle", gain: 0.08 }); setTimeout(() => this.play({ freq: 1108.7, dur: 0.12, type: "triangle", gain: 0.08 }), 120); }
+  lose()  { this.play({ freq: 220, dur: 0.12, type: "sine", gain: 0.08 }); setTimeout(() => this.play({ freq: 174.6, dur: 0.12, type: "sine", gain: 0.08 }), 120); }
+  draw()  { this.play({ freq: 400, dur: 0.08, type: "sine" }); setTimeout(() => this.play({ freq: 430, dur: 0.08 }), 80); }
+  hint()  { this.play({ freq: 700, dur: 0.06, type: "square" }); }
+}
+export const SND = new Beep();
+
 export const ROWS = 6;
 export const COLS = 7;
 
