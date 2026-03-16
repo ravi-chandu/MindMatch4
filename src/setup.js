@@ -32,7 +32,7 @@ if ("serviceWorker" in navigator) {
       caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
     }
   } else {
-    const swUrl = new URL("sw.js", import.meta.env.BASE_URL).href;
+    const swUrl = `${import.meta.env.BASE_URL}sw.js`;
     navigator.serviceWorker.register(swUrl);
   }
 }
