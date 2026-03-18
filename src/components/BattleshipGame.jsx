@@ -17,7 +17,8 @@ import {
   cellLabel,
 } from "../utils/battleshipHelpers.js";
 
-const TIMER_SECONDS = 900; // 15 min
+const TIMER_SECONDS = 900; // 15 min total (AI mode)
+const TIMER_PER_PLAYER = 450; // 7.5 min each (2P mode)
 
 export default function BattleshipGame({
   mode = "ai",
@@ -56,6 +57,28 @@ export default function BattleshipGame({
   /* ── Timer ── */
   const [timerKey, setTimerKey] = useState(0);
   const timerPaused = phase !== "battle" || !!end;
+
+  /* ── Per-player timers (2P) ── */
+  const [p1Time, setP1Time] = useState(TIMER_PER_PLAYER);
+  const [p2Time, setP2Time] = useState(TIMER_PER_PLAYER);
+
+  useEffect(() => {
+    if (!is2P || phase !== "battle" || end) return;
+    const id = setInterval(() => {
+      if (turn === 1) {
+        setP1Time((t) => {
+          if (t <= 1) { finishGame("p2"); return 0; }
+          return t - 1;
+        });
+      } else {
+        setP2Time((t) => {
+          if (t <= 1) { finishGame("p1"); return 0; }
+          return t - 1;
+        });
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [is2P, phase, end, turn]);
 
   /* ── Ghost preview during setup ── */
   const ghost = useMemo(() => {
@@ -293,6 +316,8 @@ export default function BattleshipGame({
     setLastShotBy(null);
     setEnd(null);
     setTimerKey((k) => k + 1);
+    setP1Time(TIMER_PER_PLAYER);
+    setP2Time(TIMER_PER_PLAYER);
     setCoachNote(
       "Place your Carrier (5 cells). Click a cell to position it."
     );
@@ -362,7 +387,7 @@ export default function BattleshipGame({
         </div>
 
         <div className="bs-topbar-right">
-          {phase === "battle" && (
+          {phase === "battle" && !is2P && (
             <GameTimer
               key={timerKey}
               seconds={TIMER_SECONDS}
@@ -446,7 +471,7 @@ export default function BattleshipGame({
       )}
 
       {/* ── Battle phase ── */}
-      {phase === "battle" && (
+      {phase === "battle" && !end && (
         <div className="bs-battle">
           <div className="bs-battle-grids">
             {is2P ? (
@@ -454,7 +479,10 @@ export default function BattleshipGame({
                 {/* P1 waters — P2 fires here */}
                 <div className="bs-board-col">
                   <div className={`bs-col-tag${turn === 2 ? " bs-col-tag-active" : ""}`}>
-                    Player 1{turn === 2 && " — 🎯 P2 firing"}
+                    <span>Player 1{turn === 2 && " — 🎯 P2 firing"}</span>
+                    <span className={`bs-player-timer${turn === 1 ? " bs-timer-active" : ""}${p1Time <= 60 ? " bs-timer-warn" : ""}`}>
+                      ⏱ {String(Math.floor(p1Time / 60)).padStart(2, "0")}:{String(p1Time % 60).padStart(2, "0")}
+                    </span>
                   </div>
                   <BattleshipBoard
                     grid={p2Attack}
@@ -468,7 +496,10 @@ export default function BattleshipGame({
                 {/* P2 waters — P1 fires here */}
                 <div className="bs-board-col">
                   <div className={`bs-col-tag${turn === 1 ? " bs-col-tag-active" : ""}`}>
-                    Player 2{turn === 1 && " — 🎯 P1 firing"}
+                    <span>Player 2{turn === 1 && " — 🎯 P1 firing"}</span>
+                    <span className={`bs-player-timer${turn === 2 ? " bs-timer-active" : ""}${p2Time <= 60 ? " bs-timer-warn" : ""}`}>
+                      ⏱ {String(Math.floor(p2Time / 60)).padStart(2, "0")}:{String(p2Time % 60).padStart(2, "0")}
+                    </span>
                   </div>
                   <BattleshipBoard
                     grid={p1Attack}
@@ -509,26 +540,31 @@ export default function BattleshipGame({
         </div>
       )}
 
-      {/* ── End modal ── */}
+      {/* ── End: reveal ships ── */}
       {end && (
-        <div className="modal" role="dialog" aria-modal="true">
-          <div
-            className={`dialog ${
-              end === "player_win" || end === "p1_win" ? "dialog-win" : ""
-            }`}
-          >
-            <div className="dialog-emoji">{endEmoji}</div>
-            <h2 className="dialog-title">{endTitle}</h2>
-            <p className="dialog-talk">
-              Ships sunk — You: {SHIPS.length - p2Remaining}, Enemy:{" "}
-              {SHIPS.length - p1Remaining}.
+        <div className="bs-end-reveal">
+          <div className="bs-end-header">
+            <span className="bs-end-emoji">{endEmoji}</span>
+            <h2 className="bs-end-title">{endTitle}</h2>
+            <p className="bs-end-sub">
+              Ships sunk — {is2P ? "P1" : "You"}: {SHIPS.length - p2Remaining}, {is2P ? "P2" : "Enemy"}: {SHIPS.length - p1Remaining}
             </p>
-            <div className="actions">
-              <button className="btn-primary" onClick={resetGame}>
-                Play Again
-              </button>
-              <button onClick={onBack}>Home</button>
+          </div>
+
+          <div className="bs-reveal-grids">
+            <div className="bs-reveal-col">
+              <div className="bs-reveal-tag">{is2P ? "Player 1's Fleet" : "Your Fleet"}</div>
+              <BattleshipBoard grid={p1Grid} registry={p1Registry} mode="fleet" locked label="" />
             </div>
+            <div className="bs-reveal-col">
+              <div className="bs-reveal-tag">{is2P ? "Player 2's Fleet" : "Enemy Fleet"}</div>
+              <BattleshipBoard grid={p2Grid} registry={p2Registry} mode="fleet" locked label="" />
+            </div>
+          </div>
+
+          <div className="bs-end-actions">
+            <button className="btn-primary" onClick={resetGame}>Play Again</button>
+            <button onClick={onBack}>Home</button>
           </div>
         </div>
       )}
