@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SND } from "../utils/gameHelpers.js";
 import ReversiBoard from "./ReversiBoard.jsx";
+import GameTimer from "./GameTimer.jsx";
 import {
   BLACK,
   WHITE,
@@ -33,6 +34,7 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
   );
   const [end, setEnd] = useState(null);
   const [lastMove, setLastMove] = useState(null);
+  const [timerKey, setTimerKey] = useState(0);
 
   const validMoves = useMemo(() => getValidMoves(board, turn), [board, turn]);
   const counts = useMemo(() => countDiscs(board), [board]);
@@ -113,12 +115,17 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
     );
   }
 
+  function handleTimeUp() {
+    if (!end) finishGame(board);
+  }
+
   function resetGame(nextDemoMode = demoMode) {
     setBoard(createReversiBoard());
     setTurn(BLACK);
     setDemoMode(nextDemoMode);
     setLastMove(null);
     setEnd(null);
+    setTimerKey((k) => k + 1);
     setCoachNote(
       nextDemoMode
         ? "Fresh demo started. Notice how the opening avoids risky squares near empty corners."
@@ -168,6 +175,7 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
         </div>
 
         <div className="rv-topbar-right">
+          <GameTimer key={timerKey} seconds={900} paused={!!end || demoMode} onTimeUp={handleTimeUp} />
           <button className="rv-icon-btn" onClick={() => resetGame(false)} title="New match">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
           </button>

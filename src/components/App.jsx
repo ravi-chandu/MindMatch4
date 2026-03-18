@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import Home from "./Home.jsx";
 import Game from "./Game.jsx";
 import ReversiGame from "./ReversiGame.jsx";
+import BattleshipGame from "./BattleshipGame.jsx";
 
 export default function App() {
   const [screen, setScreen] = useState("home");
@@ -13,6 +14,10 @@ export default function App() {
   const [reversiDifficulty, setReversiDifficulty] = useState(
     () => localStorage.getItem("mm4_reversi_level") || "Hard"
   );
+  const [battleshipDifficulty, setBattleshipDifficulty] = useState(
+    () => localStorage.getItem("mm4_bs_level") || "Hard"
+  );
+  const [battleshipMode, setBattleshipMode] = useState("ai");
   const [difficulty, setDifficulty] = useState(
     () => localStorage.getItem("mm4_level") || "Auto"
   );
@@ -39,8 +44,16 @@ export default function App() {
     setScreen("game");
   };
 
+  const startBattleship = (m = "ai") => {
+    setGameId("battleship");
+    setBattleshipMode(m);
+    setSeedDaily(false);
+    setReversiDemo(false);
+    setScreen("game");
+  };
+
   return (
-    <div className={`app ${gameId === "reversi" ? "app-wide" : ""}`}>
+    <div className={`app ${gameId === "reversi" || gameId === "battleship" ? "app-wide" : ""}`}>
       {screen === "home" && (
         <Home
           difficulty={difficulty}
@@ -58,6 +71,12 @@ export default function App() {
             setReversiDifficulty(d);
             localStorage.setItem("mm4_reversi_level", d);
           }}
+          onPlayBattleship={(m) => startBattleship(m)}
+          battleshipDifficulty={battleshipDifficulty}
+          setBattleshipDifficulty={(d) => {
+            setBattleshipDifficulty(d);
+            localStorage.setItem("mm4_bs_level", d);
+          }}
         />
       )}
       {screen === "game" && gameId === "connect4" && (
@@ -73,6 +92,13 @@ export default function App() {
           startInDemo={reversiDemo}
           mode={reversiMode}
           difficulty={reversiDifficulty}
+          onBack={() => setScreen("home")}
+        />
+      )}
+      {screen === "game" && gameId === "battleship" && (
+        <BattleshipGame
+          mode={battleshipMode}
+          difficulty={battleshipDifficulty}
           onBack={() => setScreen("home")}
         />
       )}

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import * as Engine from "../../ai/engine.js";
 import Board from "./Board.jsx";
 import ResultModal from "./Modal.jsx";
+import GameTimer from "./GameTimer.jsx";
 import {
   ROWS,
   COLS,
@@ -29,6 +30,7 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
   const [aiExplain, setAiExplain] = useState("");
   const [focusCol, setFocusCol] = useState(3);
   const [cautionCols, setCautionCols] = useState([]);
+  const [timerKey, setTimerKey] = useState(0);
 
   const lockedLevelRef = useRef(difficulty);
   const moves = totalPieces(board);
@@ -321,6 +323,10 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
     return true;
   }
 
+  function handleTimeUp() {
+    if (!end) finish(turn === 1 ? "ai_win" : "player_win", null);
+  }
+
   function reset() {
     setBoard(emptyBoard());
     setTurn(1);
@@ -329,6 +335,7 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
     setTalk("");
     setAiExplain("");
     startRef.current = Date.now();
+    setTimerKey((k) => k + 1);
   }
 
   async function share() {
@@ -362,6 +369,7 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
             {lockedLevelRef.current}
           </span>
         )}
+        <GameTimer key={timerKey} seconds={300} paused={!!end} onTimeUp={handleTimeUp} />
       </div>
 
       <p className="status-bar" role="status" aria-live="polite">

@@ -19,13 +19,17 @@ export default function Home({
   onWatchReversiDemo,
   reversiDifficulty,
   setReversiDifficulty,
+  onPlayBattleship,
+  battleshipDifficulty,
+  setBattleshipDifficulty,
 }) {
   const [soundOn, setSoundOn] = useState(
     () => JSON.parse(localStorage.getItem("mm4_sound_on") || "true")
   );
-  const [picked, setPicked] = useState(null); // null | "connect4" | "reversi"
+  const [picked, setPicked] = useState(null); // null | "connect4" | "reversi" | "battleship"
   const [selectedMode, setSelectedMode] = useState("ai");
   const [reversiMode, setReversiMode] = useState("ai");
+  const [battleshipMode, setBattleshipMode] = useState("ai");
 
   useEffect(() => {
     SND.toggle(soundOn);
@@ -34,6 +38,7 @@ export default function Home({
 
   const selectedLevel = LEVELS.find((x) => x.id === difficulty) || LEVELS[4];
   const selectedReversiLevel = LEVELS.find((x) => x.id === reversiDifficulty) || LEVELS[4];
+  const selectedBsLevel = LEVELS.find((x) => x.id === battleshipDifficulty) || LEVELS[4];
 
   const startConnect4 = () => {
     if (selectedMode === "ai") onPlayAI();
@@ -68,6 +73,13 @@ export default function Home({
                 <span className="game-pick-name">Reversi</span>
                 <span className="game-pick-desc">
                   Flip discs, control the board, own the corners.
+                </span>
+              </button>
+              <button className="game-pick-card game-pick-card-battleship" onClick={() => setPicked("battleship")}>
+                <span className="game-pick-icon">🚢💥</span>
+                <span className="game-pick-name">Battleship</span>
+                <span className="game-pick-desc">
+                  Hide your fleet, hunt the enemy, sink them all.
                 </span>
               </button>
             </div>
@@ -182,6 +194,58 @@ export default function Home({
               }}
             >
               {reversiMode === "demo" ? "Start Demo" : reversiMode === "2p" ? "Play: Local 2P" : "Play: vs AI"}
+            </button>
+          </>
+        )}
+
+        {/* ── Step 2c: Battleship options ── */}
+        {picked === "battleship" && (
+          <>
+            <button className="back-link" onClick={() => setPicked(null)}>
+              ← Back to games
+            </button>
+            <h2 className="home-game-title">Battleship</h2>
+            <p className="home-steps">Choose mode and difficulty, then press Play.</p>
+
+            <h3 className="section-label">Mode</h3>
+            <div className="mode-grid">
+              <button
+                className={`mode-btn ${battleshipMode === "ai" ? "active" : ""}`}
+                onClick={() => setBattleshipMode("ai")}
+              >
+                Play vs AI
+              </button>
+              <button
+                className={`mode-btn ${battleshipMode === "2p" ? "active" : ""}`}
+                onClick={() => setBattleshipMode("2p")}
+              >
+                Local 2P
+              </button>
+            </div>
+
+            {battleshipMode !== "2p" && (
+              <>
+                <h3 className="section-label">Difficulty</h3>
+                <div className="level-grid compact">
+                  {LEVELS.map((l) => (
+                    <button
+                      key={l.id}
+                      className={`level-btn ${battleshipDifficulty === l.id ? "active" : ""}`}
+                      onClick={() => setBattleshipDifficulty(l.id)}
+                    >
+                      <span className="level-name">{l.id}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="level-desc selected">{selectedBsLevel.desc}</p>
+              </>
+            )}
+
+            <button
+              className="bs-start-btn"
+              onClick={() => onPlayBattleship(battleshipMode)}
+            >
+              {battleshipMode === "2p" ? "Play: Local 2P" : "Play: vs AI"}
             </button>
           </>
         )}

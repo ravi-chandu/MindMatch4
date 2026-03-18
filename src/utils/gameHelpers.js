@@ -20,6 +20,10 @@ export class Beep {
   lose()  { this.play({ freq: 220, dur: 0.12, type: "sine", gain: 0.08 }); setTimeout(() => this.play({ freq: 174.6, dur: 0.12, type: "sine", gain: 0.08 }), 120); }
   draw()  { this.play({ freq: 400, dur: 0.08, type: "sine" }); setTimeout(() => this.play({ freq: 430, dur: 0.08 }), 80); }
   hint()  { this.play({ freq: 700, dur: 0.06, type: "square" }); }
+  splash()   { this.play({ freq: 180, dur: 0.18, type: "sine", gain: 0.05, attack: 0.01, decay: 0.12 }); }
+  explode()  { this.play({ freq: 100, dur: 0.22, type: "sawtooth", gain: 0.09, attack: 0.003, decay: 0.16 }); setTimeout(() => this.play({ freq: 80, dur: 0.14, type: "square", gain: 0.05 }), 50); }
+  sinkShip() { this.play({ freq: 400, dur: 0.1, type: "sine", gain: 0.07 }); setTimeout(() => this.play({ freq: 300, dur: 0.1, type: "sine", gain: 0.06 }), 120); setTimeout(() => this.play({ freq: 200, dur: 0.16, type: "sine", gain: 0.05 }), 240); }
+  tick()     { this.play({ freq: 900, dur: 0.03, type: "square", gain: 0.03 }); }
 }
 export const SND = new Beep();
 
