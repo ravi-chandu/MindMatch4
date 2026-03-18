@@ -74,6 +74,7 @@
   cursor:pointer;
   transition:transform .18s, border-color .18s, box-shadow .18s;
   text-align:center;
+  color:var(--ink);
 }
 .game-pick-card:hover{
   transform:translateY(-4px);
@@ -94,6 +95,7 @@
 .game-pick-name{
   font-size:1.3rem;
   font-weight:700;
+  color:var(--ink);
 }
 .game-pick-desc{
   font-size:.88rem;
@@ -1455,19 +1457,19 @@
     order:1;
   }
   .bs-battle-grids{
-    grid-template-columns:repeat(2, minmax(0, 1fr));
+    grid-template-columns:1fr;
     gap:12px;
   }
   .bs-battle-grids > .bs-board-col .bs-board-shell,
   .bs-battle-grids > .bs-board-shell{
-    max-width:min(42vh, 320px, 100%);
+    max-width:min(70vh, 400px, 100%);
   }
   .bs-reveal-grids{
-    grid-template-columns:repeat(2, minmax(0, 1fr));
+    grid-template-columns:1fr;
     gap:12px;
   }
   .bs-reveal-col .bs-board-shell{
-    max-width:min(42vh, 320px, 100%);
+    max-width:min(70vh, 400px, 100%);
   }
   .game-picker{
     grid-template-columns:1fr;

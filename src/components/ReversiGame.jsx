@@ -19,6 +19,8 @@ function playerName(player) {
   return player === BLACK ? "Black" : "White";
 }
 
+const RV_TIMER_PP = 450; // 7.5 min per player (2P mode)
+
 export default function ReversiGame({ startInDemo = false, mode = "ai", difficulty = "Hard", onBack }) {
   const is2P = mode === "2p";
   const [board, setBoard] = useState(() => createReversiBoard());
@@ -35,6 +37,28 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
   const [end, setEnd] = useState(null);
   const [lastMove, setLastMove] = useState(null);
   const [timerKey, setTimerKey] = useState(0);
+
+  /* ── Per-player timers (2P) ── */
+  const [p1Time, setP1Time] = useState(RV_TIMER_PP);
+  const [p2Time, setP2Time] = useState(RV_TIMER_PP);
+
+  useEffect(() => {
+    if (!is2P || end || demoMode) return;
+    const id = setInterval(() => {
+      if (turn === BLACK) {
+        setP1Time((t) => {
+          if (t <= 1) { finishGame(board); return 0; }
+          return t - 1;
+        });
+      } else {
+        setP2Time((t) => {
+          if (t <= 1) { finishGame(board); return 0; }
+          return t - 1;
+        });
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [is2P, end, demoMode, turn]);
 
   const validMoves = useMemo(() => getValidMoves(board, turn), [board, turn]);
   const counts = useMemo(() => countDiscs(board), [board]);
@@ -126,6 +150,8 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
     setLastMove(null);
     setEnd(null);
     setTimerKey((k) => k + 1);
+    setP1Time(RV_TIMER_PP);
+    setP2Time(RV_TIMER_PP);
     setCoachNote(
       nextDemoMode
         ? "Fresh demo started. Notice how the opening avoids risky squares near empty corners."
@@ -175,7 +201,18 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
         </div>
 
         <div className="rv-topbar-right">
-          <GameTimer key={timerKey} seconds={900} paused={!!end || demoMode} onTimeUp={handleTimeUp} />
+          {is2P ? (
+            <>
+              <span className={`bs-player-timer${turn === BLACK ? " bs-timer-active" : ""}${p1Time <= 60 ? " bs-timer-warn" : ""}`}>
+                P1 ⏱ {String(Math.floor(p1Time / 60)).padStart(2, "0")}:{String(p1Time % 60).padStart(2, "0")}
+              </span>
+              <span className={`bs-player-timer${turn === WHITE ? " bs-timer-active" : ""}${p2Time <= 60 ? " bs-timer-warn" : ""}`}>
+                P2 ⏱ {String(Math.floor(p2Time / 60)).padStart(2, "0")}:{String(p2Time % 60).padStart(2, "0")}
+              </span>
+            </>
+          ) : (
+            <GameTimer key={timerKey} seconds={900} paused={!!end || demoMode} onTimeUp={handleTimeUp} />
+          )}
           <button className="rv-icon-btn" onClick={() => resetGame(false)} title="New match">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
           </button>

@@ -21,7 +21,10 @@ import {
   SND,
 } from "../utils/gameHelpers.js";
 
+const C4_TIMER_PP = 300; // 5 min per player (2P mode)
+
 export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
+  const is2P = mode === "2p";
   const [board, setBoard] = useState(() => emptyBoard());
   const [turn, setTurn] = useState(1);
   const [end, setEnd] = useState(null);
@@ -31,6 +34,28 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
   const [focusCol, setFocusCol] = useState(3);
   const [cautionCols, setCautionCols] = useState([]);
   const [timerKey, setTimerKey] = useState(0);
+
+  /* ── Per-player timers (2P) ── */
+  const [p1Time, setP1Time] = useState(C4_TIMER_PP);
+  const [p2Time, setP2Time] = useState(C4_TIMER_PP);
+
+  useEffect(() => {
+    if (!is2P || end) return;
+    const id = setInterval(() => {
+      if (turn === 1) {
+        setP1Time((t) => {
+          if (t <= 1) { finish("ai_win", null); return 0; }
+          return t - 1;
+        });
+      } else {
+        setP2Time((t) => {
+          if (t <= 1) { finish("player_win", null); return 0; }
+          return t - 1;
+        });
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [is2P, end, turn]);
 
   const lockedLevelRef = useRef(difficulty);
   const moves = totalPieces(board);
@@ -336,6 +361,8 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
     setAiExplain("");
     startRef.current = Date.now();
     setTimerKey((k) => k + 1);
+    setP1Time(C4_TIMER_PP);
+    setP2Time(C4_TIMER_PP);
   }
 
   async function share() {
@@ -369,7 +396,18 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
             {lockedLevelRef.current}
           </span>
         )}
-        <GameTimer key={timerKey} seconds={300} paused={!!end} onTimeUp={handleTimeUp} />
+        {is2P ? (
+          <>
+            <span className={`bs-player-timer${turn === 1 ? " bs-timer-active" : ""}${p1Time <= 60 ? " bs-timer-warn" : ""}`}>
+              P1 ⏱ {String(Math.floor(p1Time / 60)).padStart(2, "0")}:{String(p1Time % 60).padStart(2, "0")}
+            </span>
+            <span className={`bs-player-timer${turn === -1 ? " bs-timer-active" : ""}${p2Time <= 60 ? " bs-timer-warn" : ""}`}>
+              P2 ⏱ {String(Math.floor(p2Time / 60)).padStart(2, "0")}:{String(p2Time % 60).padStart(2, "0")}
+            </span>
+          </>
+        ) : (
+          <GameTimer key={timerKey} seconds={300} paused={!!end} onTimeUp={handleTimeUp} />
+        )}
       </div>
 
       <p className="status-bar" role="status" aria-live="polite">
