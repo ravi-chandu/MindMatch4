@@ -301,6 +301,17 @@ export function maskedGrid(grid) {
   );
 }
 
+/* Merge defender grid (shows ships + damage) with opponent attack grid (shows misses).
+   Returns a combined view for end-of-game reveal. */
+export function revealGrid(defenderGrid, attackGrid) {
+  return defenderGrid.map((row, r) =>
+    row.map((cell, c) => {
+      if (cell === WATER && attackGrid[r][c] === MISS) return MISS;
+      return cell;
+    })
+  );
+}
+
 export function pickAIShot(attackGrid, defenderRegistry, difficulty) {
   switch (difficulty) {
     case "Easy": return aiShootEasy(attackGrid);

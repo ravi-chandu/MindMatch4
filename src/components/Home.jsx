@@ -22,6 +22,10 @@ export default function Home({
   onPlayBattleship,
   battleshipDifficulty,
   setBattleshipDifficulty,
+  p1Name,
+  setP1Name,
+  p2Name,
+  setP2Name,
 }) {
   const [soundOn, setSoundOn] = useState(
     () => JSON.parse(localStorage.getItem("mm4_sound_on") || "true")
@@ -117,6 +121,17 @@ export default function Home({
               </button>
             </div>
 
+            {selectedMode === "2p" && (
+              <div className="name-inputs">
+                <h3 className="section-label">Player Names</h3>
+                <div className="name-row">
+                  <input className="name-input" type="text" placeholder="Player 1" maxLength={16} value={p1Name} onChange={e => setP1Name(e.target.value)} />
+                  <span className="name-vs">vs</span>
+                  <input className="name-input" type="text" placeholder="Player 2" maxLength={16} value={p2Name} onChange={e => setP2Name(e.target.value)} />
+                </div>
+              </div>
+            )}
+
             <h3 className="section-label">Difficulty</h3>
             <div className="level-grid compact">
               {LEVELS.map((l) => (
@@ -167,6 +182,17 @@ export default function Home({
                 Watch Demo
               </button>
             </div>
+
+            {reversiMode === "2p" && (
+              <div className="name-inputs">
+                <h3 className="section-label">Player Names</h3>
+                <div className="name-row">
+                  <input className="name-input" type="text" placeholder="Player 1 (Black)" maxLength={16} value={p1Name} onChange={e => setP1Name(e.target.value)} />
+                  <span className="name-vs">vs</span>
+                  <input className="name-input" type="text" placeholder="Player 2 (White)" maxLength={16} value={p2Name} onChange={e => setP2Name(e.target.value)} />
+                </div>
+              </div>
+            )}
 
             {reversiMode !== "2p" && (
               <>
@@ -222,6 +248,17 @@ export default function Home({
                 Local 2P
               </button>
             </div>
+
+            {battleshipMode === "2p" && (
+              <div className="name-inputs">
+                <h3 className="section-label">Player Names</h3>
+                <div className="name-row">
+                  <input className="name-input" type="text" placeholder="Player 1" maxLength={16} value={p1Name} onChange={e => setP1Name(e.target.value)} />
+                  <span className="name-vs">vs</span>
+                  <input className="name-input" type="text" placeholder="Player 2" maxLength={16} value={p2Name} onChange={e => setP2Name(e.target.value)} />
+                </div>
+              </div>
+            )}
 
             {battleshipMode !== "2p" && (
               <>

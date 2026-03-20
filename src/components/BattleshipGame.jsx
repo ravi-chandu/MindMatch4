@@ -15,6 +15,7 @@ import {
   shipsRemaining,
   pickAIShot,
   cellLabel,
+  revealGrid,
 } from "../utils/battleshipHelpers.js";
 
 const TIMER_SECONDS = 900; // 15 min total (AI mode)
@@ -24,8 +25,12 @@ export default function BattleshipGame({
   mode = "ai",
   difficulty = "Hard",
   onBack,
+  p1Name = "Player 1",
+  p2Name = "Player 2",
 }) {
   const is2P = mode === "2p";
+  const name1 = is2P ? p1Name : "You";
+  const name2 = is2P ? p2Name : "Enemy";
 
   /* ── Phase: setup → setup_p2 → battle → end ── */
   const [phase, setPhase] = useState("setup");
@@ -53,6 +58,10 @@ export default function BattleshipGame({
     "Place your Carrier (5 cells). Click a cell to position it."
   );
   const [end, setEnd] = useState(null);
+
+  /* ── Tension state ── */
+  const [screenShake, setScreenShake] = useState(false);
+  const [tensionLevel, setTensionLevel] = useState("normal"); // normal | elevated | critical
 
   /* ── Timer ── */
   const [timerKey, setTimerKey] = useState(0);
@@ -153,7 +162,7 @@ export default function BattleshipGame({
       setCurrentShip(0);
       setHorizontal(true);
       setCoachNote(
-        "Player 2: Place your Carrier (5 cells). Click a cell to position it."
+        `${name2}: Place your Carrier (5 cells). Click a cell to position it.`
       );
       return;
     }
@@ -207,14 +216,18 @@ export default function BattleshipGame({
 
       if (result.sunk) {
         SND.sinkShip();
+        triggerShake();
         setCoachNote(
           `💥 ${label} — ${result.sunkShipName} sunk! ${shipsRemaining(result.defenderRegistry)} ships left.`
         );
       } else if (result.hit) {
-        SND.explode();
+        SND.cannon();
+        setTimeout(() => SND.explode(), 300);
+        triggerShake();
         setCoachNote(`🔥 ${label} — Hit! Keep firing nearby.`);
       } else {
-        SND.splash();
+        SND.cannon();
+        setTimeout(() => SND.splash(), 350);
         setCoachNote(`🌊 ${label} — Miss. Water splashes harmlessly.`);
       }
 
@@ -256,14 +269,18 @@ export default function BattleshipGame({
 
       if (result.sunk) {
         SND.sinkShip();
+        triggerShake();
         setCoachNote(
           `⚠️ Enemy fires ${label} — your ${result.sunkShipName} is sunk!`
         );
       } else if (result.hit) {
-        SND.explode();
+        SND.cannon();
+        setTimeout(() => SND.explode(), 300);
+        triggerShake();
         setCoachNote(`⚠️ Enemy fires ${label} — Hit on your fleet!`);
       } else {
-        SND.splash();
+        SND.cannon();
+        setTimeout(() => SND.splash(), 350);
         setCoachNote(`Enemy fires ${label} — miss! Your fleet is safe.`);
       }
 
@@ -278,13 +295,13 @@ export default function BattleshipGame({
     if (winner === "p1") {
       SND.win();
       setEnd(is2P ? "p1_win" : "player_win");
-      setCoachNote("All enemy ships destroyed! Victory is yours! 🎉");
+      setCoachNote(`All enemy ships destroyed! ${name1} wins! 🎉`);
     } else {
       SND.lose();
       setEnd(is2P ? "p2_win" : "ai_win");
       setCoachNote(
         is2P
-          ? "Player 2 destroyed all ships! Well played."
+          ? `${name2} destroyed all ships! Well played.`
           : "The enemy sank your entire fleet. Better luck next time!"
       );
     }
@@ -330,22 +347,22 @@ export default function BattleshipGame({
 
   const statusText = end
     ? end === "player_win" || end === "p1_win"
-      ? is2P ? "Player 1 wins!" : "You win!"
-      : is2P ? "Player 2 wins!" : "Enemy wins"
+      ? is2P ? `${name1} wins!` : "You win!"
+      : is2P ? `${name2} wins!` : "Enemy wins"
     : phase === "setup"
-    ? is2P ? "Player 1: Deploy your fleet" : "Deploy your fleet"
+    ? is2P ? `${name1}: Deploy your fleet` : "Deploy your fleet"
     : phase === "setup_p2"
-    ? "Player 2: Deploy your fleet"
+    ? `${name2}: Deploy your fleet`
 
     : is2P
-    ? `Player ${turn}'s turn to fire`
+    ? `${turn === 1 ? name1 : name2}'s turn to fire`
     : turn === 1
     ? "Your turn — fire!"
     : "Enemy is targeting…";
 
   const endTitle = end === "player_win" || end === "p1_win"
-    ? is2P ? "Player 1 Wins!" : "Victory!"
-    : is2P ? "Player 2 Wins!" : "Defeat";
+    ? is2P ? `${name1} Wins!` : "Victory!"
+    : is2P ? `${name2} Wins!` : "Defeat";
   const endEmoji = end === "player_win" || end === "p1_win" ? "🎉" : "💀";
 
   /* ── Keyboard: R to rotate during setup ── */
@@ -359,9 +376,36 @@ export default function BattleshipGame({
     return () => window.removeEventListener("keydown", handler);
   }, [phase]);
 
+  /* ── Tension level tracking ── */
+  useEffect(() => {
+    if (phase !== "battle" || end) return;
+    const myRemaining = shipsRemaining(p1Registry);
+    const enemyRemaining = shipsRemaining(p2Registry);
+    const minShips = Math.min(myRemaining, enemyRemaining);
+    if (minShips <= 1) {
+      setTensionLevel("critical");
+    } else if (minShips <= 2) {
+      setTensionLevel("elevated");
+    } else {
+      setTensionLevel("normal");
+    }
+  }, [phase, end, p1Registry, p2Registry]);
+
+  /* ── Sonar ping on turn switch during battle ── */
+  useEffect(() => {
+    if (phase !== "battle" || end) return;
+    SND.sonar();
+  }, [turn]);
+
+  /* ── Trigger screen shake helper ── */
+  function triggerShake() {
+    setScreenShake(true);
+    setTimeout(() => setScreenShake(false), 400);
+  }
+
   /* ── Render ── */
   return (
-    <div className="bs-page">
+    <div className={`bs-page${screenShake ? " bs-shake" : ""}${tensionLevel !== "normal" ? ` bs-tension-${tensionLevel}` : ""}`}>
       {/* ── Top bar ── */}
       <header className="bs-topbar">
         <div className="bs-topbar-left">
@@ -376,11 +420,11 @@ export default function BattleshipGame({
           {phase === "battle" && (
             <div className="bs-fleet-status">
               <span className="bs-fleet-count bs-fleet-you" title="Your ships remaining">
-                🚢 {is2P ? `P1: ${p1Remaining}` : `You: ${p1Remaining}`}
+                🚢 {is2P ? `${name1}: ${p1Remaining}` : `You: ${p1Remaining}`}
               </span>
               <span className="bs-fleet-sep">|</span>
               <span className="bs-fleet-count bs-fleet-enemy" title="Enemy ships remaining">
-                💀 {is2P ? `P2: ${p2Remaining}` : `AI: ${p2Remaining}`}
+                💀 {is2P ? `${name2}: ${p2Remaining}` : `AI: ${p2Remaining}`}
               </span>
             </div>
           )}
@@ -479,7 +523,7 @@ export default function BattleshipGame({
                 {/* P1 waters — P2 fires here */}
                 <div className="bs-board-col">
                   <div className={`bs-col-tag${turn === 2 ? " bs-col-tag-active" : ""}`}>
-                    <span>Player 1{turn === 2 && " — 🎯 P2 firing"}</span>
+                    <span>{name1}{turn === 2 && ` — 🎯 ${name2} firing`}</span>
                     <span className={`bs-player-timer${turn === 1 ? " bs-timer-active" : ""}${p1Time <= 60 ? " bs-timer-warn" : ""}`}>
                       ⏱ {String(Math.floor(p1Time / 60)).padStart(2, "0")}:{String(p1Time % 60).padStart(2, "0")}
                     </span>
@@ -496,7 +540,7 @@ export default function BattleshipGame({
                 {/* P2 waters — P1 fires here */}
                 <div className="bs-board-col">
                   <div className={`bs-col-tag${turn === 1 ? " bs-col-tag-active" : ""}`}>
-                    <span>Player 2{turn === 1 && " — 🎯 P1 firing"}</span>
+                    <span>{name2}{turn === 1 && ` — 🎯 ${name1} firing`}</span>
                     <span className={`bs-player-timer${turn === 2 ? " bs-timer-active" : ""}${p2Time <= 60 ? " bs-timer-warn" : ""}`}>
                       ⏱ {String(Math.floor(p2Time / 60)).padStart(2, "0")}:{String(p2Time % 60).padStart(2, "0")}
                     </span>
@@ -547,18 +591,18 @@ export default function BattleshipGame({
             <span className="bs-end-emoji">{endEmoji}</span>
             <h2 className="bs-end-title">{endTitle}</h2>
             <p className="bs-end-sub">
-              Ships sunk — {is2P ? "P1" : "You"}: {SHIPS.length - p2Remaining}, {is2P ? "P2" : "Enemy"}: {SHIPS.length - p1Remaining}
+              Ships sunk — {is2P ? name1 : "You"}: {SHIPS.length - p2Remaining}, {is2P ? name2 : "Enemy"}: {SHIPS.length - p1Remaining}
             </p>
           </div>
 
           <div className="bs-reveal-grids">
             <div className="bs-reveal-col">
-              <div className="bs-reveal-tag">{is2P ? "Player 1's Fleet" : "Your Fleet"}</div>
-              <BattleshipBoard grid={p1Grid} registry={p1Registry} mode="fleet" locked label="" />
+              <div className="bs-reveal-tag">{is2P ? `${name1}'s Fleet` : "Your Fleet"}</div>
+              <BattleshipBoard grid={revealGrid(p1Grid, p2Attack)} registry={p1Registry} mode="fleet" locked label="" />
             </div>
             <div className="bs-reveal-col">
-              <div className="bs-reveal-tag">{is2P ? "Player 2's Fleet" : "Enemy Fleet"}</div>
-              <BattleshipBoard grid={p2Grid} registry={p2Registry} mode="fleet" locked label="" />
+              <div className="bs-reveal-tag">{is2P ? `${name2}'s Fleet` : "Enemy Fleet"}</div>
+              <BattleshipBoard grid={revealGrid(p2Grid, p1Attack)} registry={p2Registry} mode="fleet" locked label="" />
             </div>
           </div>
 

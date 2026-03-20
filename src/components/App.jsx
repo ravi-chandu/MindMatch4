@@ -22,6 +22,16 @@ export default function App() {
     () => localStorage.getItem("mm4_level") || "Auto"
   );
 
+  /* ── Player names for 2P modes ── */
+  const [p1Name, setP1Name] = useState(
+    () => localStorage.getItem("mm4_p1_name") || ""
+  );
+  const [p2Name, setP2Name] = useState(
+    () => localStorage.getItem("mm4_p2_name") || ""
+  );
+  const effectiveP1 = p1Name.trim() || "Player 1";
+  const effectiveP2 = p2Name.trim() || "Player 2";
+
   useEffect(() => {
     const h = (e) => setScreen(e.detail?.to || "home");
     addEventListener("mm4:navigate", h);
@@ -77,6 +87,10 @@ export default function App() {
             setBattleshipDifficulty(d);
             localStorage.setItem("mm4_bs_level", d);
           }}
+          p1Name={p1Name}
+          setP1Name={(n) => { setP1Name(n); localStorage.setItem("mm4_p1_name", n); }}
+          p2Name={p2Name}
+          setP2Name={(n) => { setP2Name(n); localStorage.setItem("mm4_p2_name", n); }}
         />
       )}
       {screen === "game" && gameId === "connect4" && (
@@ -85,6 +99,8 @@ export default function App() {
           seedDaily={seedDaily}
           difficulty={difficulty}
           onBack={() => setScreen("home")}
+          p1Name={effectiveP1}
+          p2Name={effectiveP2}
         />
       )}
       {screen === "game" && gameId === "reversi" && (
@@ -93,6 +109,8 @@ export default function App() {
           mode={reversiMode}
           difficulty={reversiDifficulty}
           onBack={() => setScreen("home")}
+          p1Name={effectiveP1}
+          p2Name={effectiveP2}
         />
       )}
       {screen === "game" && gameId === "battleship" && (
@@ -100,6 +118,8 @@ export default function App() {
           mode={battleshipMode}
           difficulty={battleshipDifficulty}
           onBack={() => setScreen("home")}
+          p1Name={effectiveP1}
+          p2Name={effectiveP2}
         />
       )}
     </div>

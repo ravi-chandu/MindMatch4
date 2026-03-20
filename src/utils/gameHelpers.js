@@ -14,16 +14,77 @@ export class Beep {
     g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay + dur);
     o.start(t); o.stop(t + attack + decay + dur + 0.02);
   }
+  /* Create filtered noise burst for water/explosion textures */
+  _noise({ dur = 0.3, gain = 0.04, freq = 800, Q = 1, filterType = "lowpass" } = {}) {
+    if (!this.enabled) return;
+    const ctx = this._ctx(), len = ctx.sampleRate * dur;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const filt = ctx.createBiquadFilter(); filt.type = filterType; filt.frequency.value = freq; filt.Q.value = Q;
+    const g = ctx.createGain(); g.gain.value = 0;
+    src.connect(filt); filt.connect(g); g.connect(ctx.destination);
+    const t = ctx.currentTime;
+    g.gain.linearRampToValueAtTime(gain, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.start(t); src.stop(t + dur + 0.05);
+  }
   click() { this.play({ freq: 520, dur: 0.05, type: "square" }); }
   drop()  { this.play({ freq: 240, dur: 0.10, type: "sawtooth" }); }
   win()   { this.play({ freq: 880, dur: 0.12, type: "triangle", gain: 0.08 }); setTimeout(() => this.play({ freq: 1108.7, dur: 0.12, type: "triangle", gain: 0.08 }), 120); }
   lose()  { this.play({ freq: 220, dur: 0.12, type: "sine", gain: 0.08 }); setTimeout(() => this.play({ freq: 174.6, dur: 0.12, type: "sine", gain: 0.08 }), 120); }
   draw()  { this.play({ freq: 400, dur: 0.08, type: "sine" }); setTimeout(() => this.play({ freq: 430, dur: 0.08 }), 80); }
   hint()  { this.play({ freq: 700, dur: 0.06, type: "square" }); }
-  splash()   { this.play({ freq: 180, dur: 0.18, type: "sine", gain: 0.05, attack: 0.01, decay: 0.12 }); }
-  explode()  { this.play({ freq: 100, dur: 0.22, type: "sawtooth", gain: 0.09, attack: 0.003, decay: 0.16 }); setTimeout(() => this.play({ freq: 80, dur: 0.14, type: "square", gain: 0.05 }), 50); }
-  sinkShip() { this.play({ freq: 400, dur: 0.1, type: "sine", gain: 0.07 }); setTimeout(() => this.play({ freq: 300, dur: 0.1, type: "sine", gain: 0.06 }), 120); setTimeout(() => this.play({ freq: 200, dur: 0.16, type: "sine", gain: 0.05 }), 240); }
-  tick()     { this.play({ freq: 900, dur: 0.03, type: "square", gain: 0.03 }); }
+  /* ── Battleship enhanced sounds ── */
+  splash() {
+    // Layered water splash: low thud + filtered noise swoosh + bubble pops
+    this.play({ freq: 120, dur: 0.25, type: "sine", gain: 0.06, attack: 0.005, decay: 0.18 });
+    this._noise({ dur: 0.35, gain: 0.05, freq: 600, Q: 0.6, filterType: "lowpass" });
+    setTimeout(() => this.play({ freq: 350, dur: 0.06, type: "sine", gain: 0.02 }), 120);
+    setTimeout(() => this.play({ freq: 500, dur: 0.04, type: "sine", gain: 0.015 }), 180);
+    setTimeout(() => this.play({ freq: 280, dur: 0.05, type: "sine", gain: 0.015 }), 250);
+  }
+  explode() {
+    // Multi-layer explosion: deep boom + crackle noise + metallic ring + debris scatter
+    this.play({ freq: 55, dur: 0.35, type: "sawtooth", gain: 0.12, attack: 0.002, decay: 0.25 });
+    this._noise({ dur: 0.4, gain: 0.08, freq: 1200, Q: 0.4, filterType: "lowpass" });
+    setTimeout(() => {
+      this.play({ freq: 80, dur: 0.18, type: "square", gain: 0.06 });
+      this._noise({ dur: 0.25, gain: 0.04, freq: 2500, Q: 1, filterType: "bandpass" });
+    }, 40);
+    setTimeout(() => this.play({ freq: 1800, dur: 0.08, type: "sine", gain: 0.03 }), 80);
+    setTimeout(() => this._noise({ dur: 0.15, gain: 0.02, freq: 3000, Q: 0.5 }), 200);
+  }
+  sinkShip() {
+    // Dramatic sinking: alarm tone + hull creak + deep bubbles + underwater fade
+    this.play({ freq: 520, dur: 0.12, type: "square", gain: 0.07 });
+    setTimeout(() => this.play({ freq: 480, dur: 0.12, type: "square", gain: 0.06 }), 130);
+    setTimeout(() => {
+      this.play({ freq: 200, dur: 0.25, type: "sawtooth", gain: 0.05, attack: 0.01, decay: 0.2 });
+      this._noise({ dur: 0.3, gain: 0.03, freq: 400, Q: 2, filterType: "bandpass" });
+    }, 280);
+    setTimeout(() => this.play({ freq: 120, dur: 0.3, type: "sine", gain: 0.04, attack: 0.05, decay: 0.2 }), 480);
+    setTimeout(() => this.play({ freq: 80, dur: 0.4, type: "sine", gain: 0.03, attack: 0.05, decay: 0.3 }), 650);
+    setTimeout(() => this._noise({ dur: 0.2, gain: 0.015, freq: 300, Q: 0.6 }), 750);
+  }
+  /* Sonar ping for turn changes and tension */
+  sonar() {
+    this.play({ freq: 1320, dur: 0.15, type: "sine", gain: 0.05, attack: 0.005, decay: 0.12 });
+    setTimeout(() => this.play({ freq: 1320, dur: 0.25, type: "sine", gain: 0.025, attack: 0.01, decay: 0.2 }), 200);
+  }
+  /* Warning alarm for low ships or critical timer */
+  alarm() {
+    this.play({ freq: 660, dur: 0.08, type: "square", gain: 0.05 });
+    setTimeout(() => this.play({ freq: 550, dur: 0.08, type: "square", gain: 0.05 }), 120);
+    setTimeout(() => this.play({ freq: 660, dur: 0.08, type: "square", gain: 0.04 }), 240);
+  }
+  /* Cannon fire sound before missile lands */
+  cannon() {
+    this._noise({ dur: 0.12, gain: 0.07, freq: 800, Q: 0.3, filterType: "lowpass" });
+    this.play({ freq: 90, dur: 0.15, type: "sawtooth", gain: 0.08, attack: 0.002, decay: 0.1 });
+  }
+  tick() { this.play({ freq: 900, dur: 0.03, type: "square", gain: 0.03 }); }
 }
 export const SND = new Beep();
 

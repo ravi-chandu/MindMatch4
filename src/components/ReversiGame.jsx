@@ -21,7 +21,7 @@ function playerName(player) {
 
 const RV_TIMER_PP = 450; // 7.5 min per player (2P mode)
 
-export default function ReversiGame({ startInDemo = false, mode = "ai", difficulty = "Hard", onBack }) {
+export default function ReversiGame({ startInDemo = false, mode = "ai", difficulty = "Hard", onBack, p1Name = "Player 1", p2Name = "Player 2" }) {
   const is2P = mode === "2p";
   const [board, setBoard] = useState(() => createReversiBoard());
   const [turn, setTurn] = useState(BLACK);
@@ -31,7 +31,7 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
     startInDemo
       ? "Demo mode is running. Watch how corners and edges become priority targets."
       : is2P
-      ? "Black opens. Player 1 picks a highlighted square."
+      ? `Black opens. ${p1Name} picks a highlighted square.`
       : "Black opens. Choose one of the highlighted moves to begin."
   );
   const [end, setEnd] = useState(null);
@@ -156,7 +156,7 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
       nextDemoMode
         ? "Fresh demo started. Notice how the opening avoids risky squares near empty corners."
         : is2P
-        ? "New match ready. Player 1 is Black, Player 2 is White."
+        ? `New match ready. ${p1Name} is Black, ${p2Name} is White.`
         : "New match ready. Black moves first and highlighted cells show your legal options."
     );
   }
@@ -204,10 +204,10 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
           {is2P ? (
             <>
               <span className={`bs-player-timer${turn === BLACK ? " bs-timer-active" : ""}${p1Time <= 60 ? " bs-timer-warn" : ""}`}>
-                P1 ⏱ {String(Math.floor(p1Time / 60)).padStart(2, "0")}:{String(p1Time % 60).padStart(2, "0")}
+                {p1Name} ⏱ {String(Math.floor(p1Time / 60)).padStart(2, "0")}:{String(p1Time % 60).padStart(2, "0")}
               </span>
               <span className={`bs-player-timer${turn === WHITE ? " bs-timer-active" : ""}${p2Time <= 60 ? " bs-timer-warn" : ""}`}>
-                P2 ⏱ {String(Math.floor(p2Time / 60)).padStart(2, "0")}:{String(p2Time % 60).padStart(2, "0")}
+                {p2Name} ⏱ {String(Math.floor(p2Time / 60)).padStart(2, "0")}:{String(p2Time % 60).padStart(2, "0")}
               </span>
             </>
           ) : (

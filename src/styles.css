@@ -1570,3 +1570,127 @@
     font-size:.95rem;
   }
 }
+
+/* ════════════════════════════════════════════════════
+   Player Name Inputs
+   ════════════════════════════════════════════════════ */
+
+.name-inputs{
+  margin:8px 0 4px;
+}
+.name-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.name-input{
+  flex:1;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid var(--panel-border);
+  background:var(--bg2);
+  color:var(--ink);
+  font-size:.92rem;
+  font-weight:500;
+  outline:none;
+  transition:border-color .2s, box-shadow .2s;
+}
+.name-input:focus{
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent);
+}
+.name-input::placeholder{
+  color:var(--muted);
+  opacity:.7;
+}
+.name-vs{
+  font-size:.78rem;
+  font-weight:700;
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  flex-shrink:0;
+}
+
+/* ════════════════════════════════════════════════════
+   Battleship – Tension & Screen Shake
+   ════════════════════════════════════════════════════ */
+
+/* Screen shake on hit */
+.bs-shake{
+  animation:bs-screen-shake .4s ease-out;
+}
+@keyframes bs-screen-shake{
+  0%   { transform:translate(0, 0); }
+  15%  { transform:translate(-4px, 2px); }
+  30%  { transform:translate(4px, -2px); }
+  45%  { transform:translate(-3px, 1px); }
+  60%  { transform:translate(3px, -1px); }
+  75%  { transform:translate(-1px, 1px); }
+  100% { transform:translate(0, 0); }
+}
+
+/* Tension elevated: subtle pulsing border when 2 ships left */
+.bs-tension-elevated .bs-board-attack{
+  border-color:rgba(251,191,36,.4);
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,.04) inset,
+    0 10px 28px rgba(0,0,0,.24),
+    0 0 16px rgba(251,191,36,.12);
+  transition:border-color .5s, box-shadow .5s;
+}
+.bs-tension-elevated .bs-col-tag-active{
+  color:#fbbf24;
+  background:color-mix(in srgb, #fbbf24 10%, transparent);
+}
+
+/* Tension critical: red glow when 1 ship left */
+.bs-tension-critical .bs-board-attack{
+  border-color:rgba(239,68,68,.5);
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,.04) inset,
+    0 10px 28px rgba(0,0,0,.24),
+    0 0 20px rgba(239,68,68,.15);
+  animation:bs-critical-pulse 1.5s ease-in-out infinite;
+}
+.bs-tension-critical .bs-col-tag-active{
+  color:#ef4444;
+  background:color-mix(in srgb, #ef4444 12%, transparent);
+  animation:bs-critical-tag-pulse 1.5s ease-in-out infinite;
+}
+.bs-tension-critical .bs-fleet-count{
+  animation:bs-critical-text-pulse 1.5s ease-in-out infinite;
+}
+@keyframes bs-critical-pulse{
+  0%, 100%{ box-shadow: 0 1px 0 0 rgba(255,255,255,.04) inset, 0 10px 28px rgba(0,0,0,.24), 0 0 20px rgba(239,68,68,.12); }
+  50%{ box-shadow: 0 1px 0 0 rgba(255,255,255,.04) inset, 0 10px 28px rgba(0,0,0,.24), 0 0 30px rgba(239,68,68,.28); }
+}
+@keyframes bs-critical-tag-pulse{
+  0%, 100%{ opacity:1; }
+  50%{ opacity:.7; }
+}
+@keyframes bs-critical-text-pulse{
+  0%, 100%{ opacity:1; }
+  50%{ opacity:.6; }
+}
+
+/* Turn indicator pulse for active player board in 2P */
+.bs-col-tag-active{
+  position:relative;
+}
+.bs-col-tag-active::after{
+  content:"";
+  position:absolute;
+  left:4px;
+  top:50%;
+  transform:translateY(-50%);
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:var(--blue);
+  animation:bs-turn-dot-pulse 1.2s ease-in-out infinite;
+}
+@keyframes bs-turn-dot-pulse{
+  0%, 100%{ opacity:1; transform:translateY(-50%) scale(1); }
+  50%{ opacity:.4; transform:translateY(-50%) scale(.7); }
+}

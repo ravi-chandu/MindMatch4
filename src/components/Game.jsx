@@ -23,7 +23,7 @@ import {
 
 const C4_TIMER_PP = 300; // 5 min per player (2P mode)
 
-export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
+export default function Game({ mode, seedDaily, difficulty = "Auto", onBack, p1Name = "Player 1", p2Name = "Player 2" }) {
   const is2P = mode === "2p";
   const [board, setBoard] = useState(() => emptyBoard());
   const [turn, setTurn] = useState(1);
@@ -288,17 +288,17 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
         ? "AI wins!"
         : "Draw"
       : end === "player_win"
-      ? "P1 wins!"
+      ? `${p1Name} wins!`
       : end === "ai_win"
-      ? "P2 wins!"
+      ? `${p2Name} wins!`
       : "Draw"
     : turn === 1
     ? mode === "ai"
       ? "Your move (Yellow)"
-      : "P1 move (Yellow)"
+      : `${p1Name} move (Yellow)`
     : mode === "ai"
     ? "AI is thinking…"
-    : "P2 move (Red)";
+    : `${p2Name} move (Red)`;
 
   const playHintText = end
     ? "Tap Play Again or New to start the next round."
@@ -306,7 +306,7 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
     ? turn === 1
       ? "Your turn: tap or click any column to drop Yellow."
       : "AI is thinking. You can press Hint any time."
-    : `${turn === 1 ? "Player 1" : "Player 2"}: tap or click any column to drop.`;
+    : `${turn === 1 ? p1Name : p2Name}: tap or click any column to drop.`;
 
   function place(col, who) {
     if (end) return false;
@@ -399,10 +399,10 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack }) {
         {is2P ? (
           <>
             <span className={`bs-player-timer${turn === 1 ? " bs-timer-active" : ""}${p1Time <= 60 ? " bs-timer-warn" : ""}`}>
-              P1 ⏱ {String(Math.floor(p1Time / 60)).padStart(2, "0")}:{String(p1Time % 60).padStart(2, "0")}
+              {p1Name} ⏱ {String(Math.floor(p1Time / 60)).padStart(2, "0")}:{String(p1Time % 60).padStart(2, "0")}
             </span>
             <span className={`bs-player-timer${turn === -1 ? " bs-timer-active" : ""}${p2Time <= 60 ? " bs-timer-warn" : ""}`}>
-              P2 ⏱ {String(Math.floor(p2Time / 60)).padStart(2, "0")}:{String(p2Time % 60).padStart(2, "0")}
+              {p2Name} ⏱ {String(Math.floor(p2Time / 60)).padStart(2, "0")}:{String(p2Time % 60).padStart(2, "0")}
             </span>
           </>
         ) : (
