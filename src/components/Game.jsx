@@ -3,6 +3,7 @@ import * as Engine from "../../ai/engine.js";
 import Board from "./Board.jsx";
 import ResultModal from "./Modal.jsx";
 import GameTimer from "./GameTimer.jsx";
+import WinBanner from "./WinBanner.jsx";
 import {
   ROWS,
   COLS,
@@ -34,6 +35,11 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack, p1N
   const [focusCol, setFocusCol] = useState(3);
   const [cautionCols, setCautionCols] = useState([]);
   const [timerKey, setTimerKey] = useState(0);
+  const [bannerFinished, setBannerFinished] = useState(false);
+
+  useEffect(() => {
+    if (!end) setBannerFinished(false);
+  }, [end]);
 
   /* ── Per-player timers (2P) ── */
   const [p1Time, setP1Time] = useState(C4_TIMER_PP);
@@ -433,8 +439,12 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack, p1N
         </div>
       )}
 
+      {end && !bannerFinished && (
+        <WinBanner outcome={end} onFinished={() => setBannerFinished(true)} />
+      )}
+
       <ResultModal
-        end={end}
+        end={bannerFinished ? end : null}
         mode={mode}
         talk={talk}
         onRematch={reset}

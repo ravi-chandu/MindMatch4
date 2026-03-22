@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { SND } from "../utils/gameHelpers.js";
 import ReversiBoard from "./ReversiBoard.jsx";
 import GameTimer from "./GameTimer.jsx";
+import WinBanner from "./WinBanner.jsx";
 import {
   BLACK,
   WHITE,
@@ -37,6 +38,11 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
   const [end, setEnd] = useState(null);
   const [lastMove, setLastMove] = useState(null);
   const [timerKey, setTimerKey] = useState(0);
+  const [bannerFinished, setBannerFinished] = useState(false);
+
+  useEffect(() => {
+    if (!end) setBannerFinished(false);
+  }, [end]);
 
   /* ── Per-player timers (2P) ── */
   const [p1Time, setP1Time] = useState(RV_TIMER_PP);
@@ -117,6 +123,7 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
     if (!nextBoard) return false;
 
     SND.click();
+    setTimeout(() => SND.flip(), 100); // Slight delay for the flip sound to sync with CSS animation
     setBoard(nextBoard);
     setLastMove({ row: move.row, col: move.col, player });
     setCoachNote(`${playerName(player)} plays ${moveLabel(move.row, move.col)}. ${note}`);
@@ -282,8 +289,19 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
         )}
       </div>
 
-      {/* ── End-game modal ── */}
-      {end && (
+      {/* ── End-game modal & banner ── */}
+      {end && !bannerFinished && !demoMode && (
+        <WinBanner 
+          outcome={
+            end === "tie" ? "draw" : 
+            mode === "ai" ? (end === "black" ? "player_win" : "ai_win") : 
+                            (end === "black" ? "p1_win" : "p2_win")
+          } 
+          onFinished={() => setBannerFinished(true)} 
+        />
+      )}
+      
+      {end && (bannerFinished || demoMode) && (
         <div className="modal" role="dialog" aria-modal="true">
           <div className={`dialog ${end === "black" ? "dialog-win" : ""}`}>
             <div className="dialog-emoji">{endEmoji}</div>

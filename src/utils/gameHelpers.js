@@ -85,6 +85,26 @@ export class Beep {
     this.play({ freq: 90, dur: 0.15, type: "sawtooth", gain: 0.08, attack: 0.002, decay: 0.1 });
   }
   tick() { this.play({ freq: 900, dur: 0.03, type: "square", gain: 0.03 }); }
+
+  /* ── UI enhancements ── */
+  hover() { this.play({ freq: 1100, dur: 0.02, type: "sine", gain: 0.015 }); }
+  select() { 
+    this.play({ freq: 880, dur: 0.04, type: "square", gain: 0.04 }); 
+    setTimeout(() => this.play({ freq: 1760, dur: 0.06, type: "sine", gain: 0.04 }), 50); 
+  }
+  flip() { 
+    this._noise({ dur: 0.1, gain: 0.03, freq: 1800, Q: 0.8, filterType: "highpass" });
+    this.play({ freq: 320, dur: 0.08, type: "triangle", gain: 0.04, attack: 0.01, decay: 0.05 }); 
+  }
+  banner() {
+    this.play({ freq: 220, dur: 0.6, type: "sawtooth", gain: 0.08, attack: 0.02, decay: 0.4 });
+    setTimeout(() => this.play({ freq: 330, dur: 0.5, type: "sawtooth", gain: 0.08, attack: 0.02, decay: 0.4 }), 80);
+    setTimeout(() => this.play({ freq: 440, dur: 0.4, type: "square", gain: 0.08, attack: 0.02, decay: 0.3 }), 160);
+    setTimeout(() => {
+      this.play({ freq: 880, dur: 0.8, type: "sine", gain: 0.06, attack: 0.05, decay: 0.6 });
+      this._noise({ dur: 0.4, gain: 0.05, freq: 2000, Q: 0.5 });
+    }, 240);
+  }
 }
 export const SND = new Beep();
 

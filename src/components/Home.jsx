@@ -63,27 +63,39 @@ export default function Home({
         {/* ── Step 1: Pick a game ── */}
         {!picked && (
           <>
-            <h2 className="home-pick-title">Pick a game</h2>
+            <h2 className="home-pick-title">✦ Choose Your Arena ✦</h2>
             <div className="game-picker">
-              <button className="game-pick-card" onClick={() => setPicked("connect4")}>
-                <span className="game-pick-icon">🔴🟡</span>
+              <button 
+                className="game-pick-card" 
+                onMouseEnter={() => SND.hover()}
+                onClick={() => { SND.select(); setPicked("connect4"); }}
+              >
+                <span className="game-pick-icon">⚡</span>
                 <span className="game-pick-name">Connect Four</span>
                 <span className="game-pick-desc">
-                  Drop discs, connect four in a row, outsmart the AI.
+                  Clash minds! Drop discs in an epic 4-in-a-row battle!
                 </span>
               </button>
-              <button className="game-pick-card game-pick-card-reversi" onClick={() => setPicked("reversi")}>
-                <span className="game-pick-icon">⚫⚪</span>
+              <button 
+                className="game-pick-card game-pick-card-reversi" 
+                onMouseEnter={() => SND.hover()}
+                onClick={() => { SND.select(); setPicked("reversi"); }}
+              >
+                <span className="game-pick-icon">🌀</span>
                 <span className="game-pick-name">Reversi</span>
                 <span className="game-pick-desc">
-                  Flip discs, control the board, own the corners.
+                  Flip the tide! Master the board in this strategic showdown!
                 </span>
               </button>
-              <button className="game-pick-card game-pick-card-battleship" onClick={() => setPicked("battleship")}>
-                <span className="game-pick-icon">🚢💥</span>
+              <button 
+                className="game-pick-card game-pick-card-battleship" 
+                onMouseEnter={() => SND.hover()}
+                onClick={() => { SND.select(); setPicked("battleship"); }}
+              >
+                <span className="game-pick-icon">💥</span>
                 <span className="game-pick-name">Battleship</span>
                 <span className="game-pick-desc">
-                  Hide your fleet, hunt the enemy, sink them all.
+                  Command your fleet! Hunt and sink the enemy armada!
                 </span>
               </button>
             </div>
@@ -146,7 +158,11 @@ export default function Home({
             </div>
             <p className="level-desc selected">{selectedLevel.desc}</p>
 
-            <button className="start-btn" onClick={startConnect4}>
+            <button 
+              className="start-btn" 
+              onMouseEnter={() => SND.hover()}
+              onClick={() => { SND.select(); startConnect4(); }}
+            >
               Play: {selectedModeLabel}
             </button>
           </>
@@ -280,7 +296,8 @@ export default function Home({
 
             <button
               className="bs-start-btn"
-              onClick={() => onPlayBattleship(battleshipMode)}
+              onMouseEnter={() => SND.hover()}
+              onClick={() => { SND.select(); onPlayBattleship(battleshipMode); }}
             >
               {battleshipMode === "2p" ? "Play: Local 2P" : "Play: vs AI"}
             </button>

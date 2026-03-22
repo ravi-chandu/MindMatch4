@@ -63,7 +63,11 @@ export default function App() {
   };
 
   return (
-    <div className={`app ${gameId === "reversi" || gameId === "battleship" ? "app-wide" : ""}`}>
+    <div 
+      className={`app ${gameId === "reversi" || gameId === "battleship" ? "app-wide" : ""}`}
+      data-game={screen === "home" ? "home" : gameId}
+    >
+      <div className="crt-scanlines" />
       {screen === "home" && (
         <Home
           difficulty={difficulty}

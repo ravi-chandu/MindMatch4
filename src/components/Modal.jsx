@@ -3,11 +3,11 @@ import React from "react";
 export default function ResultModal({ end, mode, talk, onRematch, onShare, onAIFirst, onBack }) {
   if (!end) return null;
   const isWin = (mode === "ai" && end === "player_win") || (mode !== "ai" && end === "player_win");
-  const emoji = end === "player_win" ? "🎉" : end === "ai_win" ? "🤖" : "🤝";
+  const emoji = end === "player_win" ? "🏆✨" : end === "ai_win" ? "💫" : "⚔️";
   const title =
     mode === "ai"
-      ? end === "player_win" ? "You win!" : end === "ai_win" ? "AI wins" : "It's a draw"
-      : end === "player_win" ? "P1 wins!" : end === "ai_win" ? "P2 wins!" : "It's a draw";
+      ? end === "player_win" ? "VICTORY!" : end === "ai_win" ? "DEFEATED..." : "STALEMATE!"
+      : end === "player_win" ? "P1 WINS!" : end === "ai_win" ? "P2 WINS!" : "STALEMATE!";
 
   return (
     <div className="modal" role="dialog" aria-modal="true">

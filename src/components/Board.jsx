@@ -69,7 +69,11 @@ export default function Board({
                     }
                     style={{ position: "relative", zIndex: 1 }}
                   >
-                    {v !== 0 && <span className={`disc ${fill}`} />}
+                    {v !== 0 && (
+                      <span 
+                        className={`disc ${fill} ${winLine?.some((pos) => pos.c === c && pos.r === r) ? 'disc-win' : 'disc-new'}`} 
+                      />
+                    )}
                   </div>
                 );
               })}

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { SND } from "../utils/gameHelpers.js";
 import BattleshipBoard from "./BattleshipBoard.jsx";
 import GameTimer from "./GameTimer.jsx";
+import WinBanner from "./WinBanner.jsx";
 import {
   BS_SIZE,
   SHIPS,
@@ -58,6 +59,11 @@ export default function BattleshipGame({
     "Place your Carrier (5 cells). Click a cell to position it."
   );
   const [end, setEnd] = useState(null);
+  const [bannerFinished, setBannerFinished] = useState(false);
+
+  useEffect(() => {
+    if (!end) setBannerFinished(false);
+  }, [end]);
 
   /* ── Tension state ── */
   const [screenShake, setScreenShake] = useState(false);
@@ -584,8 +590,18 @@ export default function BattleshipGame({
         </div>
       )}
 
-      {/* ── End: reveal ships ── */}
-      {end && (
+      {/* ── End: reveal ships & banner ── */}
+      {end && !bannerFinished && (
+        <WinBanner 
+          outcome={
+            mode === "ai" ? (end === "p1" ? "player_win" : "ai_win") : 
+                            (end === "p1" ? "p1_win" : "p2_win")
+          } 
+          onFinished={() => setBannerFinished(true)} 
+        />
+      )}
+
+      {end && bannerFinished && (
         <div className="bs-end-reveal">
           <div className="bs-end-header">
             <span className="bs-end-emoji">{endEmoji}</span>

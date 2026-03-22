@@ -66,7 +66,8 @@ export default function ReversiBoard({
                 >
                   {cell !== 0 && (
                     <span
-                      className={`reversi-disc ${cell === BLACK ? "black" : "white"}`}
+                      key={cell}
+                      className={`reversi-disc rv-disc-flip ${cell === BLACK ? "black" : "white"}`}
                     />
                   )}
                   {cell === 0 && move && <span className="reversi-marker" />}
