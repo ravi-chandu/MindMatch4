@@ -2,13 +2,36 @@
   "name": "mindmatch4",
   "private": true,
   "version": "1.0.0",
+  "description": "MindMatch is a React strategy game hub featuring Connect Four, Reversi, and Battleship with adaptive AI modes.",
+  "homepage": "https://ravi-chandu.github.io/MindMatch4/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ravi-chandu/MindMatch4.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ravi-chandu/MindMatch4/issues"
+  },
+  "keywords": [
+    "react",
+    "vite",
+    "strategy-game",
+    "connect-four",
+    "reversi",
+    "battleship",
+    "ai"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint .",
+    "lint:fix": "ESLINT_USE_FLAT_CONFIG=false eslint . --fix",
     "format": "prettier --write ."
   },
   "dependencies": {

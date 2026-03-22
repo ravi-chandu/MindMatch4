@@ -3,18 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0a0b1e" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#f0e6ff" media="(prefers-color-scheme: light)">
 
-    <title>MindMatch | Connect Four and Reversi Brain Games</title>
-    <meta name="description" content="Play MindMatch online with two strategy games: adaptive Connect Four and guided Reversi. Built for focus, planning, and smarter play for all ages." />
+    <title>MindMatch | Connect Four, Reversi, and Battleship Strategy Games</title>
+    <meta name="description" content="Play MindMatch online with three strategy games: Connect Four, Reversi, and Battleship. Train focus, planning, and tactical thinking with polished AI and local multiplayer." />
     <link rel="canonical" href="https://ravi-chandu.github.io/MindMatch4/" />
 
-    <meta property="og:title" content="MindMatch - Connect Four and Reversi" />
-    <meta property="og:description" content="Train planning, focus, and tactical thinking with two polished strategy games in one place." />
+    <meta property="og:title" content="MindMatch - Connect Four, Reversi, and Battleship" />
+    <meta property="og:description" content="Train planning, focus, and tactical thinking with three polished strategy games in one place." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://ravi-chandu.github.io/MindMatch4/" />
     <meta property="og:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
+    <meta property="og:site_name" content="MindMatch" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:title" content="MindMatch - Connect Four, Reversi, and Battleship" />
+    <meta name="twitter:description" content="Three strategy games. One polished experience. Play against adaptive AI or local multiplayer." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://ravi-chandu.github.io/MindMatch4/og-cover.png" />
 
@@ -25,32 +29,44 @@
     <link rel="apple-touch-icon" sizes="512x512" href="/MindMatch4/logo-512.png" />
     <link rel="manifest" href="/MindMatch4/manifest.json" />
 
+    <!-- Anime Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
     <style>
       :root{
-        --bg:#ffffff; --bg2:#f3f4f6; --ink:#111827; --muted:#6b7280;
-        --panel:rgba(255,255,255,.92); --panel-border:rgba(0,0,0,.08);
-        --hole:#e5e7eb; --grid:#1f2937;
-        --red:#ef4444; --yellow:#fbbf24; --green:#16a34a; --blue:#3b82f6; --violet:#7c3aed;
-        --shadow:0 10px 30px rgba(0,0,0,.12);
+        /* ═══ Anime Dark Theme (default) ═══ */
+        --bg:#0a0b1e; --bg2:#111336; --ink:#e8e6ff; --muted:#9b97c2;
+        --panel:rgba(18,16,52,.92); --panel-border:rgba(140,120,255,.15);
+        --hole:#151540; --grid:#1e1b4b;
+        --red:#ff2d75; --yellow:#ffd700; --green:#00ff88; --blue:#00e5ff; --violet:#a855f7;
+        --pink:#ff2d75; --cyan:#00e5ff; --gold:#ffd700; --emerald:#00ff88;
+        --neon-glow:0 0 20px rgba(0,229,255,.15), 0 0 40px rgba(255,45,117,.08);
+        --shadow:0 10px 40px rgba(0,0,0,.45), 0 0 30px rgba(0,229,255,.06);
         --cell:56px; --gap:10px;
+        --font-heading:'Rajdhani', sans-serif;
+        --font-body:'Nunito', sans-serif;
       }
       @media (prefers-color-scheme: dark){
         :root{
-          --bg:#0a0f1a; --bg2:#111827; --ink:#f1f5f9; --muted:#94a3b8;
-          --panel:rgba(15,23,42,.92); --panel-border:rgba(148,163,184,.12);
-          --hole:#111827; --grid:#1e293b;
-          --shadow:0 14px 36px rgba(0,0,0,.50);
+          --bg:#0a0b1e; --bg2:#111336; --ink:#e8e6ff; --muted:#9b97c2;
+          --panel:rgba(18,16,52,.92); --panel-border:rgba(140,120,255,.15);
+          --hole:#151540; --grid:#1e1b4b;
+          --shadow:0 10px 40px rgba(0,0,0,.45), 0 0 30px rgba(0,229,255,.06);
         }
       }
       [data-theme="light"]{
-        --bg:#ffffff; --bg2:#f3f4f6; --ink:#111827; --muted:#6b7280;
-        --panel:rgba(255,255,255,.92); --panel-border:rgba(0,0,0,.08);
-        --hole:#e5e7eb; --grid:#d1d5db;
+        --bg:#f0e6ff; --bg2:#e8dff5; --ink:#1a103c; --muted:#6b5b95;
+        --panel:rgba(255,255,255,.88); --panel-border:rgba(168,85,247,.2);
+        --hole:#e0d4f5; --grid:#c4b5de;
+        --shadow:0 10px 30px rgba(100,50,200,.1), 0 0 20px rgba(168,85,247,.06);
       }
       [data-theme="dark"]{
-        --bg:#0a0f1a; --bg2:#111827; --ink:#f1f5f9; --muted:#94a3b8;
-        --panel:rgba(15,23,42,.92); --panel-border:rgba(148,163,184,.12);
-        --hole:#111827; --grid:#1e293b;
+        --bg:#0a0b1e; --bg2:#111336; --ink:#e8e6ff; --muted:#9b97c2;
+        --panel:rgba(18,16,52,.92); --panel-border:rgba(140,120,255,.15);
+        --hole:#151540; --grid:#1e1b4b;
+        --shadow:0 10px 40px rgba(0,0,0,.45), 0 0 30px rgba(0,229,255,.06);
       }
 
       *, *::before, *::after { box-sizing: border-box; }
@@ -59,25 +75,165 @@
 
       body{
         margin:0;
-        background:linear-gradient(180deg,var(--bg2),var(--bg));
+        background:var(--bg);
         color:var(--ink);
-        font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Arial,"Noto Sans";
+        font-family:var(--font-body);
+        position:relative;
+      }
+      /* ═══ Animated global background ═══ */
+      body::before{
+        content:'';
+        position:fixed;
+        inset:0;
+        z-index:0;
+        pointer-events:none;
+        background-size:250px 250px, 300px 300px, 200px 200px, 350px 350px, 280px 280px,
+                         320px 320px, 260px 260px, 340px 340px, 220px 220px, 310px 310px;
+        animation: starDrift 60s linear infinite;
+        transition: background-image 1s ease;
+      }
+      /* Default / Home Theme (Cosmic Neon) */
+      body::before { background-image:
+          radial-gradient(1.5px 1.5px at 20% 30%, rgba(0,229,255,.4), transparent),
+          radial-gradient(1px 1px at 40% 70%, rgba(255,45,117,.35), transparent),
+          radial-gradient(1.5px 1.5px at 60% 15%, rgba(255,215,0,.4), transparent),
+          radial-gradient(1px 1px at 80% 50%, rgba(0,255,136,.3), transparent),
+          radial-gradient(1.2px 1.2px at 10% 80%, rgba(168,85,247,.35), transparent),
+          radial-gradient(1px 1px at 70% 85%, rgba(0,229,255,.3), transparent),
+          radial-gradient(1.5px 1.5px at 50% 45%, rgba(255,45,117,.25), transparent),
+          radial-gradient(1px 1px at 30% 55%, rgba(255,215,0,.3), transparent),
+          radial-gradient(1.2px 1.2px at 90% 20%, rgba(168,85,247,.3), transparent),
+          radial-gradient(1px 1px at 15% 45%, rgba(0,255,136,.25), transparent);
+      }
+      /* Connect Four Theme (Warm Embers) */
+      body:has([data-game="connect4"])::before { background-image:
+          radial-gradient(1.5px 1.5px at 20% 30%, rgba(255,215,0,.4), transparent),
+          radial-gradient(1px 1px at 40% 70%, rgba(255,45,117,.4), transparent),
+          radial-gradient(1.5px 1.5px at 60% 15%, rgba(255,100,50,.35), transparent),
+          radial-gradient(1.5px 1.5px at 80% 50%, rgba(255,45,117,.3), transparent),
+          radial-gradient(1px 1px at 10% 80%, rgba(255,215,0,.3), transparent),
+          radial-gradient(1px 1px at 70% 85%, rgba(255,100,50,.4), transparent),
+          radial-gradient(2px 2px at 50% 45%, rgba(255,45,117,.25), transparent),
+          radial-gradient(1px 1px at 30% 55%, rgba(255,215,0,.3), transparent),
+          radial-gradient(1.2px 1.2px at 90% 20%, rgba(255,100,50,.35), transparent),
+          radial-gradient(1px 1px at 15% 45%, rgba(255,45,117,.25), transparent);
+      }
+      /* Reversi Theme (Emerald/Cyan Matrix) */
+      body:has([data-game="reversi"])::before { background-image:
+          radial-gradient(1.5px 1.5px at 20% 30%, rgba(0,255,136,.4), transparent),
+          radial-gradient(1px 1px at 40% 70%, rgba(0,229,255,.3), transparent),
+          radial-gradient(2px 2px at 60% 15%, rgba(0,255,136,.35), transparent),
+          radial-gradient(1px 1px at 80% 50%, rgba(0,229,255,.35), transparent),
+          radial-gradient(1.5px 1.5px at 10% 80%, rgba(0,255,136,.4), transparent),
+          radial-gradient(1px 1px at 70% 85%, rgba(0,229,255,.25), transparent),
+          radial-gradient(1.5px 1.5px at 50% 45%, rgba(0,255,136,.3), transparent),
+          radial-gradient(1px 1px at 30% 55%, rgba(0,229,255,.4), transparent),
+          radial-gradient(1px 1px at 90% 20%, rgba(0,255,136,.35), transparent),
+          radial-gradient(1px 1px at 15% 45%, rgba(0,229,255,.3), transparent);
+      }
+      /* Battleship Theme (Deep Ocean/Cyan) */
+      body:has([data-game="battleship"])::before { background-image:
+          radial-gradient(1.5px 1.5px at 20% 30%, rgba(0,180,255,.4), transparent),
+          radial-gradient(1px 1px at 40% 70%, rgba(0,229,255,.35), transparent),
+          radial-gradient(1px 1px at 60% 15%, rgba(50,100,255,.3), transparent),
+          radial-gradient(1.5px 1.5px at 80% 50%, rgba(0,229,255,.4), transparent),
+          radial-gradient(1.2px 1.2px at 10% 80%, rgba(0,180,255,.35), transparent),
+          radial-gradient(1px 1px at 70% 85%, rgba(50,100,255,.4), transparent),
+          radial-gradient(2px 2px at 50% 45%, rgba(0,229,255,.25), transparent),
+          radial-gradient(1px 1px at 30% 55%, rgba(0,180,255,.3), transparent),
+          radial-gradient(1px 1px at 90% 20%, rgba(50,100,255,.3), transparent),
+          radial-gradient(1px 1px at 15% 45%, rgba(0,229,255,.25), transparent);
+      }
+
+      @keyframes starDrift{
+        0%{background-position:0 0, 50px 30px, 100px 60px, 150px 90px, 200px 120px, 10px 10px, 60px 40px, 110px 70px, 160px 100px, 210px 130px;}
+        100%{background-position:250px 250px, 350px 330px, 300px 260px, 500px 340px, 480px 370px, 260px 260px, 360px 340px, 450px 370px, 380px 300px, 520px 380px;}
+      }
+      body::after{
+        content:'';
+        position:fixed;
+        inset:0;
+        z-index:0;
+        pointer-events:none;
+        transition: background 1s ease;
+        background:
+          radial-gradient(ellipse at 20% 0%, rgba(168,85,247,.12), transparent 50%),
+          radial-gradient(ellipse at 80% 100%, rgba(255,45,117,.1), transparent 50%),
+          radial-gradient(ellipse at 50% 50%, rgba(0,229,255,.05), transparent 60%);
+      }
+      body:has([data-game="connect4"])::after {
+        background:
+          radial-gradient(ellipse at 20% 0%, rgba(255,45,117,.12), transparent 50%),
+          radial-gradient(ellipse at 80% 100%, rgba(255,215,0,.12), transparent 50%),
+          radial-gradient(ellipse at 50% 50%, rgba(255,100,50,.08), transparent 60%);
+      }
+      body:has([data-game="reversi"])::after {
+        background:
+          radial-gradient(ellipse at 20% 0%, rgba(0,255,136,.12), transparent 50%),
+          radial-gradient(ellipse at 80% 100%, rgba(0,229,255,.12), transparent 50%),
+          radial-gradient(ellipse at 50% 50%, rgba(0,255,136,.06), transparent 60%);
+      }
+      body:has([data-game="battleship"])::after {
+        background:
+          radial-gradient(ellipse at 20% 0%, rgba(50,100,255,.15), transparent 50%),
+          radial-gradient(ellipse at 80% 100%, rgba(0,229,255,.12), transparent 50%),
+          radial-gradient(ellipse at 50% 50%, rgba(0,180,255,.08), transparent 60%);
       }
 
       .site-header{
         position:sticky; top:0; z-index:50;
         display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
-        gap:8px; padding:8px;
-        background:var(--panel); border-bottom:1px solid var(--panel-border);
-        -webkit-backdrop-filter:saturate(140%) blur(6px); backdrop-filter:saturate(140%) blur(6px);
+        gap:8px; padding:10px 16px;
+        background:var(--panel);
+        border-bottom:2px solid transparent;
+        border-image:linear-gradient(90deg, var(--pink), var(--cyan), var(--gold), var(--emerald), var(--pink)) 1;
+        -webkit-backdrop-filter:saturate(160%) blur(12px); backdrop-filter:saturate(160%) blur(12px);
       }
-      .site-title{ text-align:center; font-weight:700; letter-spacing:.4px; cursor:pointer }
+      .site-title{
+        text-align:center;
+        font-family:var(--font-heading);
+        font-weight:700;
+        font-size:1.4rem;
+        letter-spacing:2px;
+        text-transform:uppercase;
+        cursor:pointer;
+        background:linear-gradient(135deg, var(--cyan), var(--pink), var(--gold));
+        -webkit-background-clip:text;
+        -webkit-text-fill-color:transparent;
+        background-clip:text;
+        filter:drop-shadow(0 0 8px rgba(0,229,255,.3));
+        animation: glitch 5s infinite;
+      }
       .theme-toggle{ justify-self:end; display:flex; gap:6px; align-items:center }
-      .tiny{ font-size:.9rem; color:var(--muted) }
+      .theme-toggle select{
+        padding:4px 8px;
+        border-radius:8px;
+        border:1px solid var(--panel-border);
+        background:var(--bg2);
+        color:var(--ink);
+        font-family:var(--font-body);
+        font-size:.82rem;
+      }
+      .tiny{ font-size:.85rem; color:var(--muted); font-family:var(--font-body); }
 
-      .mm4-shell{ display:flex; justify-content:center; padding:12px; width:100%; }
+      .mm4-shell{ display:flex; justify-content:center; padding:12px; width:100%; position:relative; z-index:1; }
 
-      .card{ background: var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:14px; box-shadow: var(--shadow); }
+      .card{
+        background: var(--panel); border:1px solid var(--panel-border);
+        border-radius:16px; padding:14px;
+        box-shadow: var(--shadow);
+        position:relative;
+        overflow:hidden;
+      }
+      /* Subtle scan-line overlay on cards */
+      .card::before{
+        content:'';
+        position:absolute;
+        inset:0;
+        pointer-events:none;
+        background:repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(140,120,255,.015) 2px, rgba(140,120,255,.015) 4px);
+        z-index:0;
+      }
       .big-options{ display:grid; gap:12px; margin: 10px 0; }
       .big-btn{ padding:16px; border-radius:14px; border:1px solid var(--grid); background:var(--bg2); color:var(--ink); cursor:pointer; font-size:1.05rem; font-weight:600; }
       .big-btn.ai{ border-color: var(--blue) }
@@ -107,17 +263,34 @@
         display:flex; align-items:center; justify-content:center; position:relative;
       }
       .disc{ width:calc(var(--cell) - 8px); height:calc(var(--cell) - 8px); border-radius:999px; box-shadow: inset 0 4px 10px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.2); }
-      .disc.yellow{ background: radial-gradient(circle at 32% 28%, #ffe9a8, #fbbf24); border: 2px solid #d1a200; }
-      .disc.red{ background: radial-gradient(circle at 32% 28%, #ff8a8a, #ef4444); border: 2px solid #b91c1c; }
+      .disc.yellow{ background: radial-gradient(circle at 32% 28%, #fff4c2, #ffd700); border: 2px solid #b8960a; box-shadow: inset 0 4px 10px rgba(0,0,0,.2), 0 0 12px rgba(255,215,0,.4); }
+      .disc.red{ background: radial-gradient(circle at 32% 28%, #ff8aab, #ff2d75); border: 2px solid #c4174f; box-shadow: inset 0 4px 10px rgba(0,0,0,.2), 0 0 12px rgba(255,45,117,.4); }
 
       .hint-col { outline: 3px solid var(--green); outline-offset: 2px; }
       .win-line{ pointer-events:none; position:absolute; inset:0; z-index:5; width:100%; height:100%; }
 
-      .modal{ position: fixed; inset: 0; z-index: 70; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,.45); }
-      .dialog{ background: var(--panel); border: 1px solid var(--panel-border); border-radius: 18px; padding: 28px 24px 22px; width: min(92vw, 400px); color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,.25); text-align:center; }
-      .dialog h2{ margin: 0 0 8px; }
+      .modal{ position: fixed; inset: 0; z-index: 70; display:flex; align-items:center; justify-content:center; background: rgba(5,3,20,.65); backdrop-filter:blur(6px); }
+      .dialog{
+        background: var(--panel); border:2px solid var(--panel-border);
+        border-radius: 20px; padding: 28px 24px 22px; width: min(92vw, 420px);
+        color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,.4), var(--neon-glow);
+        text-align:center;
+        position:relative;
+        overflow:hidden;
+      }
+      .dialog::before{
+        content:'';
+        position:absolute;
+        inset:-2px;
+        border-radius:22px;
+        background:linear-gradient(135deg, var(--cyan), var(--pink), var(--gold), var(--emerald));
+        z-index:-1;
+        opacity:.3;
+        filter:blur(8px);
+      }
+      .dialog h2{ margin: 0 0 8px; font-family:var(--font-heading); letter-spacing:1px; }
       .dialog .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; justify-content:center }
-      .dialog button{ padding:10px 16px; border-radius:10px; border:1px solid var(--grid); background:var(--bg2); color:var(--ink); cursor:pointer; font-size:.9rem; font-weight:500 }
+      .dialog button{ padding:10px 16px; border-radius:10px; border:1px solid var(--grid); background:var(--bg2); color:var(--ink); cursor:pointer; font-size:.9rem; font-weight:600; font-family:var(--font-body); }
 
       .stats{ margin: 10px auto; text-align:center; color: var(--muted) }
       #mm4-confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
@@ -179,8 +352,8 @@
       gtag('js', new Date());
       gtag('config', 'G-E18C1B9SE4');
     </script>
-    <script type="module" crossorigin src="/MindMatch4/assets/index-DbymAI-B.js"></script>
-    <link rel="stylesheet" crossorigin href="/MindMatch4/assets/index-dVXKDPMz.css">
+    <script type="module" crossorigin src="/MindMatch4/assets/index-l8BaoGgb.js"></script>
+    <link rel="stylesheet" crossorigin href="/MindMatch4/assets/index-FI30JQE8.css">
   </head>
 
   <body>
