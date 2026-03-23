@@ -3,6 +3,7 @@ import Home from "./Home.jsx";
 import Game from "./Game.jsx";
 import ReversiGame from "./ReversiGame.jsx";
 import BattleshipGame from "./BattleshipGame.jsx";
+import GomokuGame from "./GomokuGame.jsx";
 
 export default function App() {
   const [screen, setScreen] = useState("home");
@@ -18,6 +19,10 @@ export default function App() {
     () => localStorage.getItem("mm4_bs_level") || "Hard"
   );
   const [battleshipMode, setBattleshipMode] = useState("ai");
+  const [gomokuDifficulty, setGomokuDifficulty] = useState(
+    () => localStorage.getItem("mm4_gomoku_level") || "Hard"
+  );
+  const [gomokuMode, setGomokuMode] = useState("ai");
   const [difficulty, setDifficulty] = useState(
     () => localStorage.getItem("mm4_level") || "Auto"
   );
@@ -62,9 +67,17 @@ export default function App() {
     setScreen("game");
   };
 
+  const startGomoku = (m = "ai") => {
+    setGameId("gomoku");
+    setGomokuMode(m);
+    setSeedDaily(false);
+    setReversiDemo(false);
+    setScreen("game");
+  };
+
   return (
     <div 
-      className={`app ${gameId === "reversi" || gameId === "battleship" ? "app-wide" : ""}`}
+      className={`app ${gameId === "reversi" || gameId === "battleship" || gameId === "gomoku" ? "app-wide" : ""}`}
       data-game={screen === "home" ? "home" : gameId}
     >
       <div className="crt-scanlines" />
@@ -90,6 +103,12 @@ export default function App() {
           setBattleshipDifficulty={(d) => {
             setBattleshipDifficulty(d);
             localStorage.setItem("mm4_bs_level", d);
+          }}
+          onPlayGomoku={(m) => startGomoku(m)}
+          gomokuDifficulty={gomokuDifficulty}
+          setGomokuDifficulty={(d) => {
+            setGomokuDifficulty(d);
+            localStorage.setItem("mm4_gomoku_level", d);
           }}
           p1Name={p1Name}
           setP1Name={(n) => { setP1Name(n); localStorage.setItem("mm4_p1_name", n); }}
@@ -121,6 +140,15 @@ export default function App() {
         <BattleshipGame
           mode={battleshipMode}
           difficulty={battleshipDifficulty}
+          onBack={() => setScreen("home")}
+          p1Name={effectiveP1}
+          p2Name={effectiveP2}
+        />
+      )}
+      {screen === "game" && gameId === "gomoku" && (
+        <GomokuGame
+          mode={gomokuMode}
+          difficulty={gomokuDifficulty}
           onBack={() => setScreen("home")}
           p1Name={effectiveP1}
           p2Name={effectiveP2}

@@ -22,6 +22,9 @@ export default function Home({
   onPlayBattleship,
   battleshipDifficulty,
   setBattleshipDifficulty,
+  onPlayGomoku,
+  gomokuDifficulty,
+  setGomokuDifficulty,
   p1Name,
   setP1Name,
   p2Name,
@@ -30,10 +33,11 @@ export default function Home({
   const [soundOn, setSoundOn] = useState(
     () => JSON.parse(localStorage.getItem("mm4_sound_on") || "true")
   );
-  const [picked, setPicked] = useState(null); // null | "connect4" | "reversi" | "battleship"
+  const [picked, setPicked] = useState(null); // null | "connect4" | "reversi" | "battleship" | "gomoku"
   const [selectedMode, setSelectedMode] = useState("ai");
   const [reversiMode, setReversiMode] = useState("ai");
   const [battleshipMode, setBattleshipMode] = useState("ai");
+  const [gomokuMode, setGomokuMode] = useState("ai");
 
   useEffect(() => {
     SND.toggle(soundOn);
@@ -43,6 +47,7 @@ export default function Home({
   const selectedLevel = LEVELS.find((x) => x.id === difficulty) || LEVELS[4];
   const selectedReversiLevel = LEVELS.find((x) => x.id === reversiDifficulty) || LEVELS[4];
   const selectedBsLevel = LEVELS.find((x) => x.id === battleshipDifficulty) || LEVELS[4];
+  const selectedGomokuLevel = LEVELS.find((x) => x.id === gomokuDifficulty) || LEVELS[4];
 
   const startConnect4 = () => {
     if (selectedMode === "ai") onPlayAI();
@@ -96,6 +101,17 @@ export default function Home({
                 <span className="game-pick-name">Battleship</span>
                 <span className="game-pick-desc">
                   Command your fleet! Hunt and sink the enemy armada!
+                </span>
+              </button>
+              <button 
+                className="game-pick-card game-pick-card-gomoku" 
+                onMouseEnter={() => SND.hover()}
+                onClick={() => { SND.select(); setPicked("gomoku"); }}
+              >
+                <span className="game-pick-icon">🏯</span>
+                <span className="game-pick-name">Gomoku</span>
+                <span className="game-pick-desc">
+                  Five in a row! Conquer the board with strategy!
                 </span>
               </button>
             </div>
@@ -300,6 +316,70 @@ export default function Home({
               onClick={() => { SND.select(); onPlayBattleship(battleshipMode); }}
             >
               {battleshipMode === "2p" ? "Play: Local 2P" : "Play: vs AI"}
+            </button>
+          </>
+        )}
+
+        {/* ── Step 2d: Gomoku options ── */}
+        {picked === "gomoku" && (
+          <>
+            <button className="back-link" onClick={() => setPicked(null)}>
+              ← Back to games
+            </button>
+            <h2 className="home-game-title">Gomoku</h2>
+            <p className="home-steps">Choose mode and difficulty, then press Play.</p>
+
+            <h3 className="section-label">Mode</h3>
+            <div className="mode-grid">
+              <button
+                className={`mode-btn ${gomokuMode === "ai" ? "active" : ""}`}
+                onClick={() => setGomokuMode("ai")}
+              >
+                Play vs AI
+              </button>
+              <button
+                className={`mode-btn ${gomokuMode === "2p" ? "active" : ""}`}
+                onClick={() => setGomokuMode("2p")}
+              >
+                Local 2P
+              </button>
+            </div>
+
+            {gomokuMode === "2p" && (
+              <div className="name-inputs">
+                <h3 className="section-label">Player Names</h3>
+                <div className="name-row">
+                  <input className="name-input" type="text" placeholder="Player 1 (Black)" maxLength={16} value={p1Name} onChange={e => setP1Name(e.target.value)} />
+                  <span className="name-vs">vs</span>
+                  <input className="name-input" type="text" placeholder="Player 2 (White)" maxLength={16} value={p2Name} onChange={e => setP2Name(e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            {gomokuMode !== "2p" && (
+              <>
+                <h3 className="section-label">Difficulty</h3>
+                <div className="level-grid compact">
+                  {LEVELS.map((l) => (
+                    <button
+                      key={l.id}
+                      className={`level-btn ${gomokuDifficulty === l.id ? "active" : ""}`}
+                      onClick={() => setGomokuDifficulty(l.id)}
+                    >
+                      <span className="level-name">{l.id}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="level-desc selected">{selectedGomokuLevel.desc}</p>
+              </>
+            )}
+
+            <button
+              className="start-btn start-btn-gomoku"
+              onMouseEnter={() => SND.hover()}
+              onClick={() => { SND.select(); onPlayGomoku(gomokuMode); }}
+            >
+              {gomokuMode === "2p" ? "Play: Local 2P" : "Play: vs AI"}
             </button>
           </>
         )}

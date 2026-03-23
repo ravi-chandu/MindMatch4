@@ -908,6 +908,334 @@
   50%{ opacity:1; transform:scale(1.15); }
 }
 
+/* =====================================================
+   GOMOKU
+   ===================================================== */
+.gomoku-page{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px 24px;
+  width:100%;
+}
+
+/* ── Top bar ── */
+.gk-topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  width:100%;
+  max-width:720px;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.gk-topbar-left,
+.gk-topbar-right{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.gk-title{
+  font-size:1.15rem;
+  font-weight:800;
+  background:linear-gradient(135deg, var(--gold), #ff9100);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  margin:0;
+}
+.gk-badge{
+  font-size:.7rem;
+  font-weight:700;
+  padding:2px 8px;
+  border-radius:8px;
+  background:rgba(255,215,0,.12);
+  color:var(--gold);
+  border:1px solid rgba(255,215,0,.2);
+  text-transform:uppercase;
+  letter-spacing:.5px;
+}
+.gk-icon-btn{
+  display:grid;
+  place-items:center;
+  width:32px;
+  height:32px;
+  border:none;
+  border-radius:10px;
+  background:rgba(255,255,255,.06);
+  color:var(--ink);
+  cursor:pointer;
+  transition:background .15s, color .15s;
+}
+.gk-icon-btn:hover{
+  background:rgba(255,255,255,.14);
+  color:var(--gold);
+}
+.gk-icon-btn.gk-btn-active{
+  background:rgba(255,215,0,.15);
+  color:var(--gold);
+  box-shadow:0 0 8px rgba(255,215,0,.15);
+}
+
+/* ── Scores ── */
+.gk-scores{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-weight:700;
+}
+.gk-score{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  font-size:1rem;
+  font-variant-numeric:tabular-nums;
+}
+.gk-score-sep{
+  color:var(--muted);
+}
+.gk-score-dot{
+  width:10px; height:10px;
+  border-radius:999px;
+}
+.gk-dot-black{
+  background:radial-gradient(circle at 34% 28%, #4b5563, #0a0b1e 72%);
+  box-shadow:0 0 6px rgba(0,229,255,.15);
+}
+.gk-dot-white{
+  background:radial-gradient(circle at 30% 26%, #fff, #e0d4f5 76%);
+  box-shadow:0 0 6px rgba(255,45,117,.12);
+}
+
+/* ── Status ── */
+.gk-status{
+  text-align:center;
+  font-size:.85rem;
+  font-weight:600;
+  color:var(--muted);
+  margin:0;
+  min-height:1.3em;
+  letter-spacing:.02em;
+}
+
+/* ── Body layout ── */
+.gk-body{
+  display:flex;
+  gap:20px;
+  align-items:flex-start;
+  justify-content:center;
+  width:100%;
+  max-width:720px;
+}
+.gk-body-with-guide{
+  max-width:920px;
+}
+.gk-board-area{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+  flex:1 1 auto;
+  min-width:0;
+}
+
+/* ── Coach bar ── */
+.gk-coach{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  padding:8px 12px;
+  border-radius:12px;
+  background:rgba(255,215,0,.06);
+  border:1px solid rgba(255,215,0,.1);
+}
+.gk-coach-label{
+  font-size:.65rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:var(--gold);
+  white-space:nowrap;
+}
+.gk-coach-text{
+  font-size:.8rem;
+  color:var(--muted);
+  line-height:1.35;
+}
+
+/* ── Guide sidebar ── */
+.gk-guide{
+  flex:0 0 220px;
+  padding:16px;
+  border-radius:16px;
+  background:var(--panel);
+  border:1px solid var(--grid);
+}
+.gk-guide-title{
+  font-size:.85rem;
+  font-weight:800;
+  margin:0 0 8px;
+  background:linear-gradient(135deg, var(--gold), #ff9100);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.gk-guide-text{
+  font-size:.78rem;
+  color:var(--muted);
+  line-height:1.45;
+}
+.gk-guide-section{
+  margin-top:12px;
+}
+.gk-guide-section h4{
+  font-size:.75rem;
+  font-weight:700;
+  margin:0 0 6px;
+  color:var(--gold);
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.gk-guide-list{
+  list-style:none;
+  padding:0;
+  margin:0;
+  font-size:.76rem;
+  color:var(--muted);
+  line-height:1.6;
+}
+.gk-guide-list strong{
+  color:var(--ink);
+}
+
+/* ── Board shell & grid ── */
+.gomoku-board-shell{
+  display:grid;
+  gap:2px;
+  width:100%;
+  max-width:min(72vh, 620px);
+}
+.gomoku-grid-wrap{
+  display:grid;
+  grid-template-columns:18px minmax(0, 1fr);
+  gap:2px;
+  align-items:stretch;
+}
+.gomoku-axis{
+  color:var(--muted);
+  font-size:.58rem;
+  font-weight:700;
+  opacity:.7;
+}
+.gomoku-axis-top{
+  display:grid;
+  grid-template-columns:18px repeat(15, minmax(0, 1fr));
+  gap:2px;
+  padding:0 6px;
+}
+.gomoku-axis-top span,
+.gomoku-axis-side span{
+  display:grid;
+  place-items:center;
+}
+.gomoku-axis-side{
+  display:grid;
+  grid-template-rows:repeat(15, minmax(0, 1fr));
+  gap:2px;
+}
+.gomoku-board{
+  display:grid;
+  grid-template-columns:repeat(15, minmax(0, 1fr));
+  gap:2px;
+  padding:6px;
+  border-radius:14px;
+  border:2px solid rgba(255,215,0,.18);
+  background:
+    linear-gradient(170deg, rgba(60, 42, 12, .97), rgba(36, 24, 6, .99));
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,.04) inset,
+    0 12px 32px rgba(0,0,0,.35),
+    0 0 20px rgba(255,215,0,.06);
+}
+.gomoku-board.is-locked .gomoku-cell{ cursor:default; }
+
+.gomoku-cell{
+  position:relative;
+  aspect-ratio:1;
+  border:none;
+  border-radius:4px;
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  transition:transform .1s ease, box-shadow .1s ease, background .1s ease;
+}
+.gomoku-cell:hover:not(:disabled){
+  transform:scale(1.08);
+  background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.06));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.2), 0 4px 10px rgba(0,0,0,.2);
+}
+.gomoku-cell:disabled{ cursor:default; }
+.gomoku-cell.is-last{
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--gold) 85%, #fff),
+    0 0 0 2px rgba(255,215,0,.15);
+}
+.gomoku-cell.is-win{
+  box-shadow:
+    inset 0 0 0 2px var(--gold),
+    0 0 12px rgba(255,215,0,.35);
+}
+
+.gomoku-stone{
+  width:80%;
+  height:80%;
+  border-radius:999px;
+  box-shadow:
+    inset 0 3px 6px rgba(255,255,255,.1),
+    inset 0 -3px 6px rgba(0,0,0,.35),
+    0 3px 8px rgba(0,0,0,.28);
+  transition:transform .12s ease;
+}
+.gomoku-stone.black{
+  background:radial-gradient(circle at 34% 28%, #4b5563, #0a0b1e 72%);
+  box-shadow:
+    inset 0 3px 6px rgba(255,255,255,.1),
+    inset 0 -3px 6px rgba(0,0,0,.35),
+    0 3px 8px rgba(0,0,0,.28),
+    0 0 8px rgba(0,229,255,.12);
+}
+.gomoku-stone.white{
+  background:radial-gradient(circle at 30% 26%, #ffffff, #e0d4f5 76%);
+  border:1px solid rgba(168,85,247,.15);
+  box-shadow:
+    inset 0 3px 6px rgba(255,255,255,.2),
+    inset 0 -3px 6px rgba(0,0,0,.2),
+    0 3px 8px rgba(0,0,0,.2),
+    0 0 8px rgba(255,45,117,.1);
+}
+.gomoku-stone.glow{
+  animation:gk-glow 1s ease-in-out infinite alternate;
+}
+@keyframes gk-glow{
+  from{ filter:brightness(1); }
+  to{ filter:brightness(1.3) drop-shadow(0 0 6px var(--gold)); }
+}
+
+/* ── Game pick card accent ── */
+.game-pick-card-gomoku{
+  --pick-accent:var(--gold);
+}
+
+/* ── Start button accent ── */
+.start-btn-gomoku{
+  background:linear-gradient(135deg, var(--gold), #ff9100);
+}
+.start-btn-gomoku:hover{
+  filter:brightness(1.08);
+}
+
 .modal{
   position:fixed; inset:0; z-index:70;
   display:flex; align-items:center; justify-content:center;
@@ -986,6 +1314,13 @@
   .rv-guide{
     order:1;
   }
+  .gk-body-with-guide{
+    flex-direction:column;
+  }
+  .gk-guide{
+    flex:unset;
+    width:100%;
+  }
 
   .home-pill-row{
     justify-content:flex-start;
@@ -1042,6 +1377,32 @@
     gap:3px;
   }
   .reversi-board-shell{
+    max-width:100%;
+  }
+
+  .gk-topbar{
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:6px;
+  }
+  .gk-topbar-left{ order:0; }
+  .gk-scores{ order:1; }
+  .gk-topbar-right{ order:2; }
+
+  .gomoku-board{
+    gap:1px;
+    padding:4px;
+    border-radius:10px;
+  }
+  .gomoku-cell{
+    border-radius:3px;
+  }
+  .gomoku-axis-top,
+  .gomoku-grid-wrap,
+  .gomoku-axis-side{
+    gap:1px;
+  }
+  .gomoku-board-shell{
     max-width:100%;
   }
 }
@@ -1663,6 +2024,183 @@
 .game-pick-card-battleship:hover{
   border-color:var(--cyan);
   box-shadow:0 8px 30px rgba(0,229,255,.2), 0 0 20px rgba(168,85,247,.1);
+}
+
+/* ════════════════════════════════════════════════════
+   Light Theme Contrast Overrides
+   ════════════════════════════════════════════════════ */
+[data-theme="light"] .disc.yellow{
+  background: radial-gradient(circle at 32% 28%, #fff8d8, #d39a00);
+  border: 2px solid #8a6400;
+  box-shadow:
+    inset 0 4px 10px rgba(0,0,0,.12),
+    0 0 10px rgba(176,118,0,.35),
+    0 0 18px rgba(176,118,0,.12);
+}
+
+[data-theme="light"] .disc.red{
+  background: radial-gradient(circle at 32% 28%, #ffb6c9, #d72f66);
+  border: 2px solid #922044;
+  box-shadow:
+    inset 0 4px 10px rgba(0,0,0,.12),
+    0 0 10px rgba(215,47,102,.25),
+    0 0 18px rgba(215,47,102,.1);
+}
+
+[data-theme="light"] .rv-badge{
+  background:linear-gradient(135deg, rgba(15,159,100,.12), rgba(11,134,184,.08));
+  border:1px solid rgba(15,159,100,.35);
+  color:#0f7c51;
+}
+
+[data-theme="light"] .rv-icon-btn.rv-btn-active{
+  border-color:#0f9f64;
+  background:linear-gradient(135deg, rgba(15,159,100,.14), rgba(11,134,184,.08));
+  color:#0f7c51;
+}
+
+[data-theme="light"] .rv-guide{
+  border:1px solid rgba(15,159,100,.24);
+  box-shadow:0 10px 24px rgba(31,41,55,.08);
+}
+
+[data-theme="light"] .reversi-board{
+  border:2px solid rgba(15,159,100,.32);
+  background:linear-gradient(170deg, rgba(22, 92, 56, .95), rgba(14, 63, 39, .98));
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,.12) inset,
+    0 10px 24px rgba(31,41,55,.16),
+    0 0 12px rgba(15,159,100,.12);
+}
+
+[data-theme="light"] .reversi-square{
+  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
+}
+
+[data-theme="light"] .reversi-square.is-last{
+  box-shadow:
+    inset 0 0 0 2px #b88600,
+    0 0 0 2px rgba(184,134,0,.18);
+}
+
+[data-theme="light"] .reversi-disc.white{
+  background:radial-gradient(circle at 30% 26%, #ffffff, #ddd6f3 72%);
+  border:1px solid rgba(51,65,85,.34);
+  box-shadow:
+    inset 0 4px 8px rgba(255,255,255,.45),
+    inset 0 -4px 8px rgba(30,41,59,.2),
+    0 4px 10px rgba(15,23,42,.24),
+    0 0 8px rgba(51,65,85,.2);
+}
+
+[data-theme="light"] .reversi-marker{
+  background:#19b36f;
+  box-shadow:0 0 8px rgba(25,179,111,.42), 0 0 0 5px rgba(25,179,111,.14);
+}
+
+[data-theme="light"] .gk-badge{
+  background:rgba(184,134,0,.14);
+  color:#8a6400;
+  border:1px solid rgba(138,100,0,.3);
+}
+
+[data-theme="light"] .gk-icon-btn.gk-btn-active{
+  background:rgba(184,134,0,.16);
+  color:#8a6400;
+  box-shadow:0 0 8px rgba(184,134,0,.2);
+}
+
+[data-theme="light"] .gk-coach{
+  background:rgba(184,134,0,.08);
+  border:1px solid rgba(138,100,0,.22);
+}
+
+[data-theme="light"] .gk-coach-label,
+[data-theme="light"] .gk-guide-section h4{
+  color:#8a6400;
+}
+
+[data-theme="light"] .gk-guide-title{
+  background:linear-gradient(135deg, #9a7100, #c88713);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+[data-theme="light"] .gomoku-board{
+  border:2px solid rgba(138,100,0,.4);
+  background:linear-gradient(170deg, rgba(95, 66, 20, .96), rgba(65, 43, 10, .99));
+  box-shadow:
+    0 1px 0 0 rgba(255,255,255,.12) inset,
+    0 10px 24px rgba(31,41,55,.18),
+    0 0 12px rgba(138,100,0,.18);
+}
+
+[data-theme="light"] .gomoku-cell{
+  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
+}
+
+[data-theme="light"] .gomoku-cell.is-last{
+  box-shadow:
+    inset 0 0 0 2px #b88600,
+    0 0 0 2px rgba(184,134,0,.22);
+}
+
+[data-theme="light"] .gomoku-cell.is-win{
+  box-shadow:
+    inset 0 0 0 2px #b88600,
+    0 0 10px rgba(184,134,0,.4);
+}
+
+[data-theme="light"] .gomoku-stone.white,
+[data-theme="light"] .gk-dot-white{
+  background:radial-gradient(circle at 30% 26%, #ffffff, #ddd6f3 72%);
+  border:1px solid rgba(51,65,85,.35);
+  box-shadow:
+    inset 0 3px 6px rgba(255,255,255,.5),
+    inset 0 -3px 6px rgba(30,41,59,.18),
+    0 3px 8px rgba(15,23,42,.26);
+}
+
+[data-theme="light"] .bs-board-setup,
+[data-theme="light"] .bs-board-fleet{
+  background:linear-gradient(170deg, rgba(35, 96, 138, .93), rgba(18, 64, 104, .96));
+  border:1px solid rgba(12,80,128,.45);
+}
+
+[data-theme="light"] .bs-board-attack{
+  background:linear-gradient(170deg, rgba(26, 84, 129, .94), rgba(14, 52, 92, .97));
+  border:1px solid rgba(10,70,118,.44);
+}
+
+[data-theme="light"] .bs-cell{
+  background:linear-gradient(180deg, rgba(108,177,222,.28), rgba(79,139,190,.22));
+  box-shadow:inset 0 0 0 1px rgba(209,234,253,.45);
+}
+
+[data-theme="light"] .bs-cell:hover:not(:disabled){
+  background:linear-gradient(180deg, rgba(140,197,231,.42), rgba(102,162,208,.34));
+  box-shadow:inset 0 0 0 1px rgba(234,248,255,.62), 0 3px 10px rgba(30,58,95,.22);
+}
+
+[data-theme="light"] .bs-miss{
+  background:linear-gradient(135deg, rgba(87,155,204,.22), rgba(63,123,182,.16)) !important;
+}
+
+[data-theme="light"] .bs-marker-miss{
+  color:rgba(225,243,255,.94);
+}
+
+[data-theme="light"] .bs-coach-label{
+  color:#0b6fa0;
+}
+
+[data-theme="light"] .game-pick-card-battleship{
+  background:
+    radial-gradient(circle at top right, rgba(11,134,184,.16), transparent 50%),
+    linear-gradient(160deg, rgba(39,94,153,.18), rgba(11,134,184,.1), var(--bg2));
+  border-color:rgba(11,134,184,.32);
 }
 
 /* ════════════════════════════════════════════════════
