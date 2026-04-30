@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { SND } from "../utils/gameHelpers.js";
+import { recordGame } from "../utils/progress.js";
 import BattleshipBoard from "./BattleshipBoard.jsx";
 import GameTimer from "./GameTimer.jsx";
 import WinBanner from "./WinBanner.jsx";
@@ -310,6 +311,9 @@ export default function BattleshipGame({
           ? `${name2} destroyed all ships! Well played.`
           : "The enemy sank your entire fleet. Better luck next time!"
       );
+    }
+    if (!is2P) {
+      recordGame("battleship", { won: winner === "p1", score: winner === "p1" ? 1 : 0, difficulty });
     }
   }
 

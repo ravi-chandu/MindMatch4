@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { SND } from "../utils/gameHelpers.js";
+import { recordGame } from "../utils/progress.js";
 import GomokuBoard from "./GomokuBoard.jsx";
 import GameTimer from "./GameTimer.jsx";
 import WinBanner from "./WinBanner.jsx";
@@ -96,6 +97,9 @@ export default function GomokuGame({ mode = "ai", difficulty = "Hard", onBack, p
       SND.draw();
       setEnd("draw");
       setCoachNote("The board is full — a rare draw!");
+    }
+    if (!is2P && winner !== 0) {
+      recordGame("gomoku", { won: winner === BLACK, score: winner === BLACK ? 1 : 0, difficulty });
     }
   }
 
