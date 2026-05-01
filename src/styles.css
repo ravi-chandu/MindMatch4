@@ -3781,6 +3781,101 @@
   .dash-stat-num { font-size: 18px; }
 }
 
+/* ─────────────────────────────────────────────
+   Theme fixes for mini-games + dashboard pages
+   Ensures Light mode uses palette tokens instead
+   of hardcoded dark colors.
+   ───────────────────────────────────────────── */
+[data-theme="light"] .math-timebar {
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+[data-theme="light"] .math-time-text {
+  color: var(--bg);
+  text-shadow: 0 1px 2px rgba(255,255,255,0.65);
+}
+[data-theme="light"] .math-problem,
+[data-theme="light"] .math-choice,
+[data-theme="light"] .pb-xpbar,
+[data-theme="light"] .word-slot,
+[data-theme="light"] .word-action-btn,
+[data-theme="light"] .dash-game-row,
+[data-theme="light"] .dash-ach,
+[data-theme="light"] .dash-stat {
+  background: color-mix(in srgb, var(--panel) 82%, var(--bg2));
+  border-color: var(--panel-border);
+}
+[data-theme="light"] .math-choice-key,
+[data-theme="light"] .stroop-key {
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+[data-theme="light"] .math-choice:hover:not(:disabled) {
+  border-color: var(--gold);
+}
+
+[data-theme="light"] .toast {
+  background: linear-gradient(135deg, #ffffff, #f4ecff);
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgba(75, 42, 140, 0.18);
+}
+[data-theme="light"] .toast-text {
+  opacity: 0.75;
+}
+
+[data-theme="light"] .dash-card {
+  background: color-mix(in srgb, var(--panel) 94%, #ffffff);
+  border: 1px solid var(--panel-border);
+  color: var(--ink);
+}
+[data-theme="light"] .dash-close {
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: var(--ink);
+}
+[data-theme="light"] .dash-stat-num,
+[data-theme="light"] .dash-game-bars b,
+[data-theme="light"] .pb-level,
+[data-theme="light"] .word-slot,
+[data-theme="light"] .math-q {
+  color: var(--gold);
+}
+[data-theme="light"] .pb-streak,
+[data-theme="light"] .math-feedback-bad,
+[data-theme="light"] .word-action-skip,
+[data-theme="light"] .dash-reset {
+  color: #c13a5c;
+}
+[data-theme="light"] .math-feedback-ok,
+[data-theme="light"] .toast-ach {
+  color: #1f7a4d;
+}
+
+[data-theme="light"] .word-tile {
+  background: linear-gradient(135deg, #ffffff, #f5eeff);
+  border-color: color-mix(in srgb, var(--cyan) 48%, transparent);
+  color: var(--cyan);
+}
+[data-theme="light"] .word-tile:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f7f0ff, #ece2ff);
+  border-color: var(--cyan);
+}
+
+[data-theme="light"] .stroop-choice {
+  border-color: color-mix(in srgb, var(--ink) 22%, transparent);
+  text-shadow: none;
+}
+
+[data-theme="light"] .mascot-close {
+  border-color: color-mix(in srgb, var(--ink) 22%, transparent);
+  background: color-mix(in srgb, var(--ink) 16%, transparent);
+}
+[data-theme="light"] .mascot-bubble {
+  background: #ffffff;
+  color: var(--ink);
+  box-shadow: 0 10px 28px rgba(75, 42, 140, 0.2);
+}
+[data-theme="light"] .mascot-bubble-tail {
+  background: #ffffff;
+}
+
 
 /* ─────────────────────────────────────────────
    Mascot — friendly dancing guide (right corner)
