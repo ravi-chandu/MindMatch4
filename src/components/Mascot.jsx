@@ -108,9 +108,6 @@ function pick(arr, lastIdx) {
 }
 
 export default function Mascot({ context = "home", gameId = null }) {
-  const [hidden, setHidden] = useState(
-    () => sessionStorage.getItem("mm4_mascot_hidden") === "1"
-  );
   const [bubble, setBubble] = useState(null);
   const [mood, setMood] = useState("idle");
   const [tipIdx, setTipIdx] = useState(0);
@@ -121,7 +118,6 @@ export default function Mascot({ context = "home", gameId = null }) {
 
   /* ── Listen for game-outcome events ── */
   useEffect(() => {
-    if (hidden) return;
     function onMascot(e) {
       const d = e.detail || {};
       const m = d.mood || "cheer";
@@ -151,21 +147,20 @@ export default function Mascot({ context = "home", gameId = null }) {
     }
     window.addEventListener("mm4:mascot", onMascot);
     return () => window.removeEventListener("mm4:mascot", onMascot);
-  }, [hidden]);
+  }, []);
 
   /* Greet shortly after appearing on home */
   useEffect(() => {
-    if (hidden) return;
     if (context === "home") {
       const t = setTimeout(() => speak(), 800);
       return () => clearTimeout(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hidden, context]);
+  }, [context]);
 
   /* In-game idle hint */
   useEffect(() => {
-    if (hidden || context !== "game") return;
+    if (context !== "game") return;
     const reset = () => {
       if (idleTimer.current) clearTimeout(idleTimer.current);
       idleTimer.current = setTimeout(() => speak(), 18000);
@@ -177,7 +172,7 @@ export default function Mascot({ context = "home", gameId = null }) {
       events.forEach((e) => window.removeEventListener(e, reset));
       if (idleTimer.current) clearTimeout(idleTimer.current);
     };
-  }, [hidden, context, gameId]);
+  }, [context, gameId]);
 
   function speak() {
     const pool =
@@ -193,14 +188,6 @@ export default function Mascot({ context = "home", gameId = null }) {
     if (moodTimer.current) clearTimeout(moodTimer.current);
     moodTimer.current = setTimeout(() => setMood("idle"), 3500);
   }
-
-  function dismiss(e) {
-    e.stopPropagation();
-    setHidden(true);
-    sessionStorage.setItem("mm4_mascot_hidden", "1");
-  }
-
-  if (hidden) return null;
 
   return (
     <div className={`mascot mascot-${context} mascot-mood-${mood}`} aria-live="polite">
@@ -225,15 +212,6 @@ export default function Mascot({ context = "home", gameId = null }) {
         )}
         {mood === "sad" && <span className="mascot-tear" aria-hidden="true">💧</span>}
         <span className="mascot-shadow" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className="mascot-close"
-        onClick={dismiss}
-        aria-label="Hide guide"
-        title="Hide for now"
-      >
-        ✕
       </button>
     </div>
   );
