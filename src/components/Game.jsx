@@ -4,6 +4,7 @@ import Board from "./Board.jsx";
 import ResultModal from "./Modal.jsx";
 import GameTimer from "./GameTimer.jsx";
 import WinBanner from "./WinBanner.jsx";
+import { recordGame } from "../utils/progress.js";
 import {
   ROWS,
   COLS,
@@ -347,6 +348,13 @@ export default function Game({ mode, seedDaily, difficulty = "Auto", onBack, p1N
     const announce = document.getElementById("announce");
     if (announce) announce.textContent = `${statusText} — ${talk}`;
     record(outcomeKey);
+    if (mode === "ai") {
+      const won = outcomeKey === "player_win";
+      const lost = outcomeKey === "ai_win";
+      if (won || lost) {
+        recordGame("connect4", { won, score: won ? 1 : 0, durationSec: Math.round(ms / 1000), difficulty });
+      }
+    }
     window.dispatchEvent(
       new CustomEvent("mm4:gameend", { detail: { outcome: outcomeKey } })
     );

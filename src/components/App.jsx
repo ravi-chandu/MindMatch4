@@ -4,6 +4,15 @@ import Game from "./Game.jsx";
 import ReversiGame from "./ReversiGame.jsx";
 import BattleshipGame from "./BattleshipGame.jsx";
 import GomokuGame from "./GomokuGame.jsx";
+import Twenty48Game from "./Twenty48Game.jsx";
+import MemoryGame from "./MemoryGame.jsx";
+import SimonGame from "./SimonGame.jsx";
+import MathGame from "./MathGame.jsx";
+import WordGame from "./WordGame.jsx";
+import StroopGame from "./StroopGame.jsx";
+import ToastHost from "./ToastHost.jsx";
+import ParentDashboard from "./ParentDashboard.jsx";
+import Mascot from "./Mascot.jsx";
 
 export default function App() {
   const [screen, setScreen] = useState("home");
@@ -23,6 +32,20 @@ export default function App() {
     () => localStorage.getItem("mm4_gomoku_level") || "Hard"
   );
   const [gomokuMode, setGomokuMode] = useState("ai");
+  const [memoryDifficulty, setMemoryDifficulty] = useState(
+    () => localStorage.getItem("mm4_mem_level") || "Medium"
+  );
+  const [memoryMode, setMemoryMode] = useState("solo");
+  const [mathLevel, setMathLevel] = useState(
+    () => localStorage.getItem("mm4_math_level") || "Medium"
+  );
+  const [kidsMode, setKidsMode] = useState(
+    () => JSON.parse(localStorage.getItem("mm4_kids_mode") || "false")
+  );
+  const [wordLevel, setWordLevel] = useState(
+    () => localStorage.getItem("mm4_word_level") || "Medium"
+  );
+  const [showDashboard, setShowDashboard] = useState(false);
   const [difficulty, setDifficulty] = useState(
     () => localStorage.getItem("mm4_level") || "Auto"
   );
@@ -75,9 +98,52 @@ export default function App() {
     setScreen("game");
   };
 
+  const startTwenty48 = () => {
+    setGameId("twenty48");
+    setSeedDaily(false);
+    setReversiDemo(false);
+    setScreen("game");
+  };
+
+  const startMemory = (m = "solo") => {
+    setGameId("memory");
+    setMemoryMode(m);
+    setSeedDaily(false);
+    setReversiDemo(false);
+    setScreen("game");
+  };
+
+  const startSimon = () => {
+    setGameId("simon");
+    setSeedDaily(false);
+    setReversiDemo(false);
+    setScreen("game");
+  };
+
+  const startMath = () => {
+    setGameId("math");
+    setSeedDaily(false);
+    setReversiDemo(false);
+    setScreen("game");
+  };
+
+  const startWord = () => {
+    setGameId("word");
+    setSeedDaily(false);
+    setReversiDemo(false);
+    setScreen("game");
+  };
+
+  const startStroop = () => {
+    setGameId("stroop");
+    setSeedDaily(false);
+    setReversiDemo(false);
+    setScreen("game");
+  };
+
   return (
     <div 
-      className={`app ${gameId === "reversi" || gameId === "battleship" || gameId === "gomoku" ? "app-wide" : ""}`}
+      className={`app ${gameId === "reversi" || gameId === "battleship" || gameId === "gomoku" || gameId === "twenty48" || gameId === "memory" || gameId === "simon" || gameId === "math" || gameId === "word" || gameId === "stroop" ? "app-wide" : ""}`}
       data-game={screen === "home" ? "home" : gameId}
     >
       <div className="crt-scanlines" />
@@ -109,6 +175,33 @@ export default function App() {
           setGomokuDifficulty={(d) => {
             setGomokuDifficulty(d);
             localStorage.setItem("mm4_gomoku_level", d);
+          }}
+          onPlayTwenty48={() => startTwenty48()}
+          onPlayMemory={(m) => startMemory(m)}
+          memoryDifficulty={memoryDifficulty}
+          setMemoryDifficulty={(d) => {
+            setMemoryDifficulty(d);
+            localStorage.setItem("mm4_mem_level", d);
+          }}
+          onPlaySimon={() => startSimon()}
+          onPlayMath={() => startMath()}
+          onPlayWord={() => startWord()}
+          onPlayStroop={() => startStroop()}
+          onOpenDashboard={() => setShowDashboard(true)}
+          mathLevel={mathLevel}
+          setMathLevel={(d) => {
+            setMathLevel(d);
+            localStorage.setItem("mm4_math_level", d);
+          }}
+          wordLevel={wordLevel}
+          setWordLevel={(d) => {
+            setWordLevel(d);
+            localStorage.setItem("mm4_word_level", d);
+          }}
+          kidsMode={kidsMode}
+          setKidsMode={(v) => {
+            setKidsMode(v);
+            localStorage.setItem("mm4_kids_mode", JSON.stringify(v));
           }}
           p1Name={p1Name}
           setP1Name={(n) => { setP1Name(n); localStorage.setItem("mm4_p1_name", n); }}
@@ -154,6 +247,33 @@ export default function App() {
           p2Name={effectiveP2}
         />
       )}
+      {screen === "game" && gameId === "twenty48" && (
+        <Twenty48Game onBack={() => setScreen("home")} />
+      )}
+      {screen === "game" && gameId === "memory" && (
+        <MemoryGame
+          mode={memoryMode}
+          difficulty={memoryDifficulty}
+          onBack={() => setScreen("home")}
+          p1Name={effectiveP1}
+          p2Name={effectiveP2}
+        />
+      )}
+      {screen === "game" && gameId === "simon" && (
+        <SimonGame onBack={() => setScreen("home")} kidsMode={kidsMode} />
+      )}
+      {screen === "game" && gameId === "math" && (
+        <MathGame level={mathLevel} onBack={() => setScreen("home")} kidsMode={kidsMode} />
+      )}
+      {screen === "game" && gameId === "word" && (
+        <WordGame level={wordLevel} onBack={() => setScreen("home")} kidsMode={kidsMode} />
+      )}
+      {screen === "game" && gameId === "stroop" && (
+        <StroopGame onBack={() => setScreen("home")} kidsMode={kidsMode} />
+      )}
+      {showDashboard && <ParentDashboard onClose={() => setShowDashboard(false)} />}
+      <ToastHost />
+      <Mascot context={screen === "game" ? "game" : "home"} gameId={screen === "game" ? gameId : null} />
     </div>
   );
 }

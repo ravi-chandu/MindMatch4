@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SND } from "../utils/gameHelpers.js";
+import { recordGame } from "../utils/progress.js";
 import ReversiBoard from "./ReversiBoard.jsx";
 import GameTimer from "./GameTimer.jsx";
 import WinBanner from "./WinBanner.jsx";
@@ -113,6 +114,14 @@ export default function ReversiGame({ startInDemo = false, mode = "ai", difficul
       SND.draw();
       setEnd("draw");
       setCoachNote("Perfect balance. Neither side finished ahead.");
+    }
+    if (!is2P && !demoMode && winner !== 0) {
+      const counts = countDiscs(finalBoard);
+      recordGame("reversi", {
+        won: winner === BLACK,
+        score: counts[BLACK] || 0,
+        difficulty,
+      });
     }
   }
 
