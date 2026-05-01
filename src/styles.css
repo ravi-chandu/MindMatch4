@@ -3131,7 +3131,7 @@
    Simon Says
    ───────────────────────────────────────────── */
 .simon-page {
-  max-width: 600px;
+  max-width: 600px; /* Simon Says */
   margin: 0 auto;
   padding: 16px;
 }
@@ -3143,20 +3143,36 @@
   gap: 12px;
   margin-bottom: 16px;
 }
+.simon-topbar-left { display: flex; align-items: center; gap: 10px; }
+.simon-topbar-right { display: flex; align-items: center; gap: 8px; }
 .simon-title { margin: 0; font-size: 24px; }
+.simon-stats { display: flex; gap: 16px; }
 .simon-score-box {
   display: flex;
-  gap: 16px;
-  font-size: 14px;
-  opacity: 0.85;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
-.simon-score-box b { font-size: 18px; color: #ffd24c; }
+.simon-score-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  opacity: 0.55;
+  text-transform: uppercase;
+}
+.simon-score-val {
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffd24c;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
 @keyframes simonPop {
   0%   { transform: scale(1);   color: #ffd24c; }
   50%  { transform: scale(1.5); color: #6bff6b; }
   100% { transform: scale(1);   color: #ffd24c; }
 }
-.simon-score-pop b { animation: simonPop 0.4s ease-out; }
+.simon-score-pop { animation: simonPop 0.4s ease-out; }
 .simon-status {
   text-align: center;
   font-size: 18px;
@@ -3165,67 +3181,93 @@
   font-weight: 600;
 }
 
+/* Outer circular shell */
 .simon-stage {
   position: relative;
   width: min(420px, 90vw);
   height: min(420px, 90vw);
   margin: 0 auto;
-  border-radius: 50%;
-  background: #111;
+}
+
+/* The 2x2 pad grid — fills the circle shape */
+.simon-pad {
+  width: 100%;
+  height: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
   gap: 8px;
   padding: 10px;
   box-sizing: border-box;
+  border-radius: 50%;
+  background: #111;
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
 }
-.simon-pad {
+.simon-pad-locked .simon-quad { cursor: default; }
+
+/* Individual quadrant buttons */
+.simon-quad {
   width: 100%;
   height: 100%;
   border: none;
   cursor: pointer;
-  transition: filter 0.1s, transform 0.05s;
-  opacity: 0.7;
+  transition: filter 0.1s, transform 0.08s, opacity 0.1s;
+  opacity: 0.6;
 }
-.simon-pad:disabled { cursor: not-allowed; }
-.simon-pad:hover:not(:disabled) { opacity: 0.85; }
-.simon-pad-active { opacity: 1; filter: brightness(1.6) saturate(1.4); transform: scale(0.97); }
-.simon-quad-tl { background: #2ecc71; border-radius: 100% 8px 8px 8px; }
-.simon-quad-tr { background: #e74c3c; border-radius: 8px 100% 8px 8px; }
-.simon-quad-bl { background: #f1c40f; border-radius: 8px 8px 8px 100%; }
-.simon-quad-br { background: #3498db; border-radius: 8px 8px 100% 8px; }
+.simon-quad:hover:not(:disabled) { opacity: 0.82; }
+.simon-quad:disabled { cursor: default; }
+.simon-quad-active { opacity: 1 !important; filter: brightness(1.7) saturate(1.5); transform: scale(0.96); }
 
+/* Colors — matched to PADS label in simonHelpers.js */
+.simon-quad-green  { background: #2ecc71; border-radius: 100% 8px 8px 8px; }
+.simon-quad-red    { background: #e74c3c; border-radius: 8px 100% 8px 8px; }
+.simon-quad-yellow { background: #f1c40f; border-radius: 8px 8px 8px 100%; }
+.simon-quad-blue   { background: #3498db; border-radius: 8px 8px 100% 8px; }
+
+/* Center circle overlay */
 .simon-center {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 38%;
-  height: 38%;
+  width: 36%;
+  height: 36%;
   border-radius: 50%;
   background: #1a1a1a;
   border: 4px solid #333;
   color: #fff;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  pointer-events: none;
+  overflow: hidden;
+  padding: 4px;
+  box-sizing: border-box;
+}
+.simon-start {
+  pointer-events: auto;
+  background: linear-gradient(135deg, #ffd24c, #ff9f1c);
+  color: #1a1a1a;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
   transition: transform 0.1s;
 }
-.simon-center:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.05); }
-.simon-center:disabled { cursor: default; }
-.simon-start { background: linear-gradient(135deg, #ffd24c, #ff9f1c); color: #1a1a1a; }
-.simon-center-text { line-height: 1.2; }
+.simon-start:hover { transform: scale(1.06); }
+.simon-center-text { line-height: 1.3; text-align: center; font-size: 20px; }
 
+/* Progress bar inside center circle (keep it small) */
+.simon-center-progress { width: 100%; padding: 0 6px; box-sizing: border-box; }
 .simon-progress-track {
-  margin: 16px auto 4px;
-  width: min(420px, 90vw);
-  height: 6px;
-  background: rgba(255,255,255,0.1);
+  width: 100%;
+  height: 5px;
+  background: rgba(255,255,255,0.15);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -3236,9 +3278,9 @@
 }
 .simon-step-counter {
   text-align: center;
-  font-size: 12px;
+  font-size: 10px;
   opacity: 0.6;
-  margin-top: 4px;
+  margin-top: 3px;
 }
 .simon-tip {
   text-align: center;
@@ -3248,8 +3290,8 @@
 }
 
 /* Kids Mode Simon */
-.home-kids .simon-pad { min-height: 120px; }
-.home-kids .simon-center { font-size: 18px; }
+.kids-mode .simon-quad { opacity: 0.75; }
+.kids-mode .simon-center { font-size: 16px; }
 
 /* ─────────────────────────────────────────────
    Math Sprint
